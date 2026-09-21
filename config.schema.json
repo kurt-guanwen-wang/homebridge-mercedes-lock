@@ -1,0 +1,54 @@
+{
+  "pluginAlias": "MercedesLock",
+  "pluginType": "platform",
+  "singular": true,
+  "headerDisplay": "Shows your Mercedes-Benz vehicle's door lock status (read-only) in HomeKit. Logs in directly with your Mercedes Me account credentials \u2014 no Home Assistant required.\n\n**Security notes:** use a dedicated Mercedes Me account with MFA disabled for this plugin (invite it as an additional driver on your car). Do not use the same account simultaneously in the official Mercedes Me app.",
+  "footerDisplay": "This plugin uses an unofficial, reverse-engineered API and is not affiliated with or endorsed by Mercedes-Benz. Use at your own risk \u2014 misuse may result in your Mercedes account being blocked.",
+  "schema": {
+    "type": "object",
+    "properties": {
+      "name": {
+        "title": "Platform Name",
+        "type": "string",
+        "default": "Mercedes Lock",
+        "required": true
+      },
+      "username": {
+        "title": "Mercedes Me Email",
+        "type": "string",
+        "required": true,
+        "description": "Use a dedicated secondary account invited as an additional driver on your vehicle."
+      },
+      "password": {
+        "title": "Mercedes Me Password",
+        "type": "string",
+        "format": "password",
+        "required": true
+      },
+      "region": {
+        "title": "Region",
+        "type": "string",
+        "default": "North America",
+        "oneOf": [
+          { "title": "Europe", "enum": ["Europe"] },
+          { "title": "North America", "enum": ["North America"] },
+          { "title": "Asia-Pacific", "enum": ["Asia-Pacific"] },
+          { "title": "China (currently blocked by CAPTCHA upstream)", "enum": ["China"] }
+        ],
+        "required": true
+      },
+      "vin": {
+        "title": "VIN (optional)",
+        "type": "string",
+        "description": "Leave blank to auto-discover the first vehicle on the account. Set this if the account has multiple vehicles."
+      },
+      "pollIntervalSeconds": {
+        "title": "Poll Interval (seconds)",
+        "type": "integer",
+        "default": 180,
+        "minimum": 60,
+        "description": "How often to fetch the latest door lock status. Matches Mercedes' own app polling interval; do not set too low to avoid rate limiting / account flags."
+      }
+    }
+  }
+}
