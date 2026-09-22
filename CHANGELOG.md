@@ -1,3 +1,15 @@
+# [1.1.0](https://github.com/kurt-guanwen-wang/homebridge-mercedes-lock/compare/v1.0.0...v1.1.0) (2026-09-22)
+
+
+### Bug Fixes
+
+* avoid HomeKit-invalid parentheses in accessory name ([cacb411](https://github.com/kurt-guanwen-wang/homebridge-mercedes-lock/commit/cacb41179a1db46219cc5c5f9fca0bac248863e5))
+
+
+### Features
+
+* add a plugin-level debug logging toggle ([fec2716](https://github.com/kurt-guanwen-wang/homebridge-mercedes-lock/commit/fec27163cfedc2bf4028037a4511084f7e16ffaf))
+
 # 1.0.0 (2026-09-22)
 
 
