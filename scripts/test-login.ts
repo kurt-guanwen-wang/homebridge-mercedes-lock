@@ -1,7 +1,7 @@
 /**
- * Standalone CLI to test the Mercedes login + door-lock fetch without
- * running Homebridge at all. Useful for verifying credentials/region work
- * before wiring this into the actual plugin.
+ * Standalone CLI to test the Mercedes login + full vehicle-status fetch
+ * without running Homebridge at all. Useful for verifying credentials/
+ * region work before wiring this into the actual plugin.
  *
  * Usage:
  *   MB_USERNAME=you@example.com MB_PASSWORD='...' MB_REGION="North America" \
@@ -48,15 +48,20 @@ async function main() {
   }
   console.log(`Using VIN: ${targetVin}`);
 
-  const reading = await api.getDoorLockStatus(targetVin);
-  console.log('Door lock reading:', reading);
+  const reading = await api.getVehicleStatus(targetVin);
+  console.log('Vehicle status:', reading);
   console.log(
-    reading.value === 1 || reading.value === 2
-      ? '=> LOCKED'
-      : reading.value === 0 || reading.value === 3
-        ? '=> UNLOCKED'
-        : '=> UNKNOWN',
+    reading.lock === 1 || reading.lock === 2
+      ? 'Lock: LOCKED'
+      : reading.lock === 0 || reading.lock === 3
+        ? 'Lock: UNLOCKED'
+        : 'Lock: UNKNOWN',
   );
+  console.log('Doors open:', reading.doorsOpen ?? 'not reported');
+  console.log('Windows/sunroof open:', reading.windowsOpen ?? 'not reported');
+  console.log('Interior lights on:', reading.lightsOn ?? 'not reported');
+  console.log('Fuel level %:', reading.fuelPercent ?? 'not reported');
+  console.log('EV charge %:', reading.evPercent ?? 'not reported');
 }
 
 main().catch((err) => {
