@@ -148,10 +148,19 @@ export class MercedesLockPlatform implements DynamicPlatformPlugin {
   private setupAccessory(vin: string, cfg: MercedesLockConfig): CarAccessory {
     const uuid = this.api.hap.uuid.generate(`mercedes-lock-${vin}`);
     let accessory = this.accessories.find((a) => a.UUID === uuid);
+    const name = `Car ${vin.slice(-6)}`;
 
     if (!accessory) {
-      accessory = new this.api.platformAccessory(`Car (${vin.slice(-6)})`, uuid);
+      accessory = new this.api.platformAccessory(name, uuid);
       this.api.registerPlatformAccessories(PLUGIN_NAME, PLATFORM_NAME, [accessory]);
+    } else if (accessory.displayName !== name) {
+      // Self-heal accessories cached from an older plugin version that
+      // used a HomeKit-invalid name (e.g. "Car (810963)" - parentheses
+      // aren't allowed and trigger a HAP-NodeJS "invalid Name
+      // characteristic" warning).
+      accessory.displayName = name;
+      const infoService = accessory.getService(this.api.hap.Service.AccessoryInformation);
+      infoService?.updateCharacteristic(this.api.hap.Characteristic.Name, name);
     }
 
     const options: CarAccessoryOptions = {
