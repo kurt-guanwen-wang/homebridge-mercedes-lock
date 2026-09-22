@@ -57,3 +57,60 @@ export enum DoorLockStatusVehicle {
 }
 
 export const DOOR_LOCK_ATTRIBUTE_KEY = 'doorlockstatusvehicle';
+
+/**
+ * doorstatus{position} / decklidstatus proto enum values, shared across all
+ * per-door attributes (vsu_enums.py: DOORSTATUS_CLOSED/OPEN). Verified
+ * against seydx/homebridge-mercedesme's binary_sensor door handler and
+ * ReneNulschDE/mbapi2020's binary_sensor.py.
+ */
+export enum DoorStatus {
+  CLOSED = 0,
+  OPEN = 1,
+}
+
+export const DOOR_STATUS_ATTRIBUTE_KEYS = [
+  'doorstatusfrontleft',
+  'doorstatusfrontright',
+  'doorstatusrearleft',
+  'doorstatusrearright',
+  'decklidstatus',
+] as const;
+
+/** windowstatus{position} proto enum values (vsu_enums.py: WINDOWSTATUS_*). */
+export enum WindowStatus {
+  INTERMEDIATE = 0,
+  COMPLETELY_OPENED = 1,
+  COMPLETELY_CLOSED = 2,
+  AIRING_POSITION = 3,
+}
+
+export const WINDOW_STATUS_ATTRIBUTE_KEYS = [
+  'windowstatusfrontleft',
+  'windowstatusfrontright',
+  'windowstatusrearleft',
+  'windowstatusrearright',
+] as const;
+
+/** sunroofstatus proto enum values (vsu_enums.py: SUNROOFSTATUS_*). */
+export enum SunroofStatus {
+  CLOSED = 0,
+  COMPLETE_OPEN = 1,
+  LIFTING_OPEN = 2,
+  RUNNING = 3,
+}
+
+export const SUNROOF_STATUS_ATTRIBUTE_KEY = 'sunroofstatus';
+
+/** Fuel tank level, 0-100 (int_value). Present on combustion/hybrid vehicles. */
+export const FUEL_LEVEL_ATTRIBUTE_KEY = 'tanklevelpercent';
+
+/** EV state of charge, 0-100 (int_value). Present on EV/hybrid vehicles. */
+export const EV_SOC_ATTRIBUTE_KEY = 'soc';
+
+/**
+ * Interior light attributes are booleans (bool_value), unlike the
+ * enum-based door/window/sunroof statuses above - confirmed via
+ * vsu_enums.py having no INTERIORLIGHTS or READINGLAMP enum entries.
+ */
+export const INTERIOR_LIGHT_ATTRIBUTE_KEYS = ['interiorLightsFront', 'interiorLightsRear'] as const;

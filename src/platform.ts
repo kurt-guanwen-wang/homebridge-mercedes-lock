@@ -3,7 +3,7 @@ import { PLATFORM_NAME, PLUGIN_NAME } from './settings';
 import { MercedesOAuth } from './oauth';
 import { TokenCache } from './tokenCache';
 import { MercedesApi } from './mbApi';
-import { LockStatusAccessory } from './lockAccessory';
+import { CarAccessory } from './carAccessory';
 import { Region } from './constants';
 
 interface MercedesLockConfig extends PlatformConfig {
@@ -16,7 +16,7 @@ interface MercedesLockConfig extends PlatformConfig {
 
 export class MercedesLockPlatform implements DynamicPlatformPlugin {
   private readonly accessories: PlatformAccessory[] = [];
-  private lockAccessory: LockStatusAccessory | null = null;
+  private carAccessory: CarAccessory | null = null;
   private api2!: MercedesApi;
   private vin: string | null = null;
   private pollTimer: NodeJS.Timeout | null = null;
@@ -66,7 +66,7 @@ export class MercedesLockPlatform implements DynamicPlatformPlugin {
       return;
     }
 
-    this.lockAccessory = this.setupAccessory(this.vin);
+    this.carAccessory = this.setupAccessory(this.vin);
 
     const pollMs = Math.max(60, cfg.pollIntervalSeconds ?? 180) * 1000;
     await this.refresh();
@@ -80,25 +80,25 @@ export class MercedesLockPlatform implements DynamicPlatformPlugin {
     return vehicles[0]?.vin ?? null;
   }
 
-  private setupAccessory(vin: string): LockStatusAccessory {
+  private setupAccessory(vin: string): CarAccessory {
     const uuid = this.api.hap.uuid.generate(`mercedes-lock-${vin}`);
     let accessory = this.accessories.find((a) => a.UUID === uuid);
 
     if (!accessory) {
-      accessory = new this.api.platformAccessory(`Car Door Lock (${vin.slice(-6)})`, uuid);
+      accessory = new this.api.platformAccessory(`Car (${vin.slice(-6)})`, uuid);
       this.api.registerPlatformAccessories(PLUGIN_NAME, PLATFORM_NAME, [accessory]);
     }
 
-    return new LockStatusAccessory(this.api, accessory);
+    return new CarAccessory(this.api, accessory);
   }
 
   private async refresh(): Promise<void> {
-    if (!this.vin || !this.lockAccessory) {
+    if (!this.vin || !this.carAccessory) {
       return;
     }
-    const reading = await this.api2.getDoorLockStatus(this.vin);
-    this.lockAccessory.update(reading.value);
-    this.log.debug('Door lock status raw value: %s (status=%s)', reading.value, reading.status);
+    const status = await this.api2.getVehicleStatus(this.vin);
+    this.carAccessory.update(status);
+    this.log.debug('Vehicle status: %j', status);
   }
 
   private hashAccount(username: string): string {

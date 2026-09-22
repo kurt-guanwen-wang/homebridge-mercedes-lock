@@ -2,7 +2,8 @@ import { randomUUID } from 'node:crypto';
 import { request } from 'undici';
 import { MercedesOAuth } from './oauth';
 import { Region, restBaseUrl, widgetBaseUrl } from './constants';
-import { decodeDoorLockStatus, DoorLockReading } from './proto';
+import { decodeVehicleAttributes } from './proto';
+import { CarStatus, interpretCarStatus } from './vehicleStatus';
 
 export interface Vehicle {
   vin: string;
@@ -48,7 +49,13 @@ export class MercedesApi {
     return body.map((v) => ({ vin: String(v.vin ?? v.finorvin) }));
   }
 
-  async getDoorLockStatus(vin: string): Promise<DoorLockReading> {
+  /**
+   * Fetches every reported vehicle attribute in a single call (lock,
+   * doors, windows, fuel/EV level, interior lights) and interprets them
+   * into a typed CarStatus. Ported from mbapi2020's webapi.py
+   * `get_car_p2b_data_via_rest`.
+   */
+  async getVehicleStatus(vin: string): Promise<CarStatus> {
     const res = await request(`${widgetBaseUrl(this.region)}/v1/vehicle/${vin}/vehicleattributes`, {
       method: 'GET',
       headers: await this.headers(),
@@ -58,6 +65,6 @@ export class MercedesApi {
       throw new Error(`Failed to fetch vehicle attributes: HTTP ${res.statusCode} - ${text}`);
     }
     const buffer = Buffer.from(await res.body.arrayBuffer());
-    return decodeDoorLockStatus(buffer);
+    return interpretCarStatus(decodeVehicleAttributes(buffer));
   }
 }
