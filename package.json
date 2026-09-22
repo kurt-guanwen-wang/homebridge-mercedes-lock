@@ -1,6 +1,6 @@
 {
   "name": "homebridge-mercedes-lock",
-  "version": "0.2.2",
+  "version": "0.2.3",
   "description": "Homebridge plugin exposing your Mercedes-Benz car's door lock status (read-only) in HomeKit. Handles Mercedes Me account login directly, no Home Assistant required.",
   "license": "MIT",
   "main": "dist/index.js",
