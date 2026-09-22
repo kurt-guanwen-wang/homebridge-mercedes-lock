@@ -42,6 +42,53 @@ export function widgetBaseUrl(region: Region): string {
   return `https://widget.${WIDGET_ENV[region]}-prod.mobilesdk.mercedes-benz.com`;
 }
 
+/**
+ * Per-app-request fingerprint fields the Mercedes Me mobile app sends on
+ * every REST call (`app_version.py`'s `apply_webapi_headers`). Without
+ * these (X-ApplicationName, ris-application-version, ris-sdk-version, and
+ * a real app User-Agent instead of a generic HTTP client's), the backend's
+ * bot detection can reject requests outright (observed as HTTP 418).
+ */
+const APPLICATION_NAME: Record<Region, string> = {
+  Europe: 'mycar-store-ece',
+  'North America': 'mycar-store-us',
+  'Asia-Pacific': 'mycar-store-ap',
+  China: 'mycar-store-cn',
+};
+
+const APPLICATION_VERSION: Record<Region, string> = {
+  Europe: '1.68.0 (3060)',
+  'North America': '3.67.0',
+  'Asia-Pacific': '1.67.0',
+  China: '1.67.0',
+};
+
+const RIS_SDK_VERSION = '4.10.0';
+const RIS_SDK_VERSION_CN = '2.132.2';
+
+const WEBAPI_USER_AGENT = 'Mercedes-Benz/3044 CFNetwork/3860.400.22 Darwin/25.3.0';
+const WEBAPI_USER_AGENT_CN =
+  'MyStarCN/1.63.0 (com.daimler.ris.mercedesme.cn.ios; build:1758; iOS 16.3.1) Alamofire/5.4.0';
+
+export function applicationName(region: Region): string {
+  return APPLICATION_NAME[region];
+}
+
+export function applicationVersion(region: Region): string {
+  return APPLICATION_VERSION[region];
+}
+
+export function sdkVersion(region: Region): string {
+  return region === 'China' ? RIS_SDK_VERSION_CN : RIS_SDK_VERSION;
+}
+
+export function webApiUserAgent(region: Region): string {
+  return region === 'China' ? WEBAPI_USER_AGENT_CN : WEBAPI_USER_AGENT;
+}
+
+export const RIS_OS_NAME = 'ios';
+export const RIS_OS_VERSION = '26.3';
+
 export const MOBILE_SAFARI_USER_AGENT =
   'Mozilla/5.0 (iPhone; CPU iPhone OS 15_8_3 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/15.6.6 Mobile/15E148 Safari/604.1';
 

@@ -1,7 +1,17 @@
 import { randomUUID } from 'node:crypto';
 import { request } from 'undici';
 import { MercedesOAuth } from './oauth';
-import { Region, restBaseUrl, widgetBaseUrl } from './constants';
+import {
+  applicationName,
+  applicationVersion,
+  Region,
+  restBaseUrl,
+  RIS_OS_NAME,
+  RIS_OS_VERSION,
+  sdkVersion,
+  webApiUserAgent,
+  widgetBaseUrl,
+} from './constants';
 import { decodeVehicleAttributes } from './proto';
 import { CarStatus, interpretCarStatus } from './vehicleStatus';
 
@@ -29,8 +39,12 @@ export class MercedesApi {
       authorization: `Bearer ${token}`,
       'x-sessionid': this.sessionId,
       'x-trackingid': randomUUID().toUpperCase(),
-      'ris-os-name': 'ios',
-      'ris-os-version': '26.3',
+      'ris-os-name': RIS_OS_NAME,
+      'ris-os-version': RIS_OS_VERSION,
+      'x-applicationname': applicationName(this.region),
+      'ris-application-version': applicationVersion(this.region),
+      'ris-sdk-version': sdkVersion(this.region),
+      'user-agent': webApiUserAgent(this.region),
       'x-locale': 'en-US',
       'content-type': 'application/json; charset=UTF-8',
     };
