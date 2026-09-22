@@ -59,8 +59,21 @@ export class MercedesApi {
       const text = await res.body.text();
       throw new Error(`Failed to list vehicles: HTTP ${res.statusCode} - ${text}`);
     }
-    const body = (await res.body.json()) as Array<Record<string, unknown>>;
-    return body.map((v) => ({ vin: String(v.vin ?? v.finorvin) }));
+    // The response is a "masterdata" object, not a bare array: vehicles
+    // live under `assignedVehicles`, plus `bookedVehicles` per fleet for
+    // fleet/company accounts. Ported from mbapi2020's __init__.py.
+    const body = (await res.body.json()) as Record<string, unknown>;
+    const vehicles: Array<Record<string, unknown>> = [];
+    const fleets = Array.isArray(body.fleets) ? (body.fleets as Array<Record<string, unknown>>) : [];
+    for (const fleet of fleets) {
+      if (Array.isArray(fleet.bookedVehicles)) {
+        vehicles.push(...(fleet.bookedVehicles as Array<Record<string, unknown>>));
+      }
+    }
+    if (Array.isArray(body.assignedVehicles)) {
+      vehicles.push(...(body.assignedVehicles as Array<Record<string, unknown>>));
+    }
+    return vehicles.map((v) => ({ vin: String(v.vin ?? v.fin ?? v.finorvin) }));
   }
 
   /**
