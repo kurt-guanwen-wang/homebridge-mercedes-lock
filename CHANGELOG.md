@@ -1,3 +1,10 @@
+# [0.3.0](https://github.com/kurt-guanwen-wang/homebridge-mercedes-lock/compare/v0.2.3...v0.3.0) (2026-09-22)
+
+
+### Features
+
+* add real-time WebSocket status and unit tests ([2d97341](https://github.com/kurt-guanwen-wang/homebridge-mercedes-lock/commit/2d97341242e4b94566a3e97d02876f8df2fd54a8))
+
 ## [0.2.3](https://github.com/kurt-guanwen-wang/homebridge-mercedes-lock/compare/v0.2.2...v0.2.3) (2026-09-22)
 
 
