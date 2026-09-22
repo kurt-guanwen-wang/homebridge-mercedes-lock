@@ -1,13 +1,25 @@
-import type { API, Characteristic, PlatformAccessory, Service } from 'homebridge';
+import type { API, Characteristic, PlatformAccessory, Service, WithUUID } from 'homebridge';
 import { DoorLockStatusVehicle } from './constants';
 import { CarStatus } from './vehicleStatus';
+
+/** Per-service on/off switches, wired to config.schema.json's `show*` toggles. */
+export interface CarAccessoryOptions {
+  showLock: boolean;
+  showDoors: boolean;
+  showWindows: boolean;
+  showLights: boolean;
+  showFuelBattery: boolean;
+  showEvBattery: boolean;
+}
 
 /**
  * A single HomeKit "device" for the car, exposing everything as separate
  * read-only services on one PlatformAccessory (matches how
  * seydx/homebridge-mercedesme grouped car.js's services under one
  * accessory): door lock, doors, windows, interior lights, and (if
- * applicable) fuel/EV battery level.
+ * applicable) fuel/EV battery level. Each service is independently
+ * toggleable via `CarAccessoryOptions`; disabled services are removed from
+ * the accessory (including previously cached ones) so they don't linger.
  *
  * All writable characteristics (LockTargetState, the lights' On) are
  * intentionally no-ops that snap back to the last known reading - this
@@ -15,45 +27,78 @@ import { CarStatus } from './vehicleStatus';
  */
 export class CarAccessory {
   private readonly Characteristic: typeof Characteristic;
-  private readonly lockService: Service;
-  private readonly doorsService: Service;
-  private readonly windowsService: Service;
-  private readonly lightsService: Service;
+  private lockService: Service | null = null;
+  private doorsService: Service | null = null;
+  private windowsService: Service | null = null;
+  private lightsService: Service | null = null;
   private fuelBatteryService: Service | null = null;
   private evBatteryService: Service | null = null;
 
   constructor(
     private readonly api: API,
     private readonly accessory: PlatformAccessory,
+    private readonly options: CarAccessoryOptions,
   ) {
     this.Characteristic = api.hap.Characteristic;
     const Service = api.hap.Service;
 
-    this.lockService =
-      this.accessory.getServiceById(Service.LockMechanism, 'lock') ??
-      this.accessory.addService(Service.LockMechanism, 'Door Lock', 'lock');
-    this.lockService.getCharacteristic(this.Characteristic.LockTargetState).onSet((value) => {
-      const current = this.lockService.getCharacteristic(this.Characteristic.LockCurrentState).value ?? 0;
-      setImmediate(() => this.lockService.updateCharacteristic(this.Characteristic.LockTargetState, current));
-      void value;
-    });
+    if (options.showLock) {
+      this.lockService =
+        this.accessory.getServiceById(Service.LockMechanism, 'lock') ??
+        this.accessory.addService(Service.LockMechanism, 'Door Lock', 'lock');
+      this.lockService.getCharacteristic(this.Characteristic.LockTargetState).onSet((value) => {
+        const service = this.lockService!;
+        const current = service.getCharacteristic(this.Characteristic.LockCurrentState).value ?? 0;
+        setImmediate(() => service.updateCharacteristic(this.Characteristic.LockTargetState, current));
+        void value;
+      });
+    } else {
+      this.removeServiceById(Service.LockMechanism, 'lock');
+    }
 
-    this.doorsService =
-      this.accessory.getServiceById(Service.ContactSensor, 'doors') ??
-      this.accessory.addService(Service.ContactSensor, 'Doors', 'doors');
+    if (options.showDoors) {
+      this.doorsService =
+        this.accessory.getServiceById(Service.ContactSensor, 'doors') ??
+        this.accessory.addService(Service.ContactSensor, 'Doors', 'doors');
+    } else {
+      this.removeServiceById(Service.ContactSensor, 'doors');
+    }
 
-    this.windowsService =
-      this.accessory.getServiceById(Service.ContactSensor, 'windows') ??
-      this.accessory.addService(Service.ContactSensor, 'Windows', 'windows');
+    if (options.showWindows) {
+      this.windowsService =
+        this.accessory.getServiceById(Service.ContactSensor, 'windows') ??
+        this.accessory.addService(Service.ContactSensor, 'Windows', 'windows');
+    } else {
+      this.removeServiceById(Service.ContactSensor, 'windows');
+    }
 
-    this.lightsService =
-      this.accessory.getServiceById(Service.Lightbulb, 'lights') ??
-      this.accessory.addService(Service.Lightbulb, 'Interior Lights', 'lights');
-    this.lightsService.getCharacteristic(this.Characteristic.On).onSet((value) => {
-      const current = this.lightsService.getCharacteristic(this.Characteristic.On).value ?? false;
-      setImmediate(() => this.lightsService.updateCharacteristic(this.Characteristic.On, current));
-      void value;
-    });
+    if (options.showLights) {
+      this.lightsService =
+        this.accessory.getServiceById(Service.Lightbulb, 'lights') ??
+        this.accessory.addService(Service.Lightbulb, 'Interior Lights', 'lights');
+      this.lightsService.getCharacteristic(this.Characteristic.On).onSet((value) => {
+        const service = this.lightsService!;
+        const current = service.getCharacteristic(this.Characteristic.On).value ?? false;
+        setImmediate(() => service.updateCharacteristic(this.Characteristic.On, current));
+        void value;
+      });
+    } else {
+      this.removeServiceById(Service.Lightbulb, 'lights');
+    }
+
+    if (!options.showFuelBattery) {
+      this.removeServiceById(Service.Battery, 'fuel-battery');
+    }
+    if (!options.showEvBattery) {
+      this.removeServiceById(Service.Battery, 'ev-battery');
+    }
+  }
+
+  private removeServiceById(serviceType: WithUUID<typeof Service>, subtype: string): void {
+    const existing = this.accessory.getServiceById(serviceType, subtype);
+    if (existing) {
+      this.accessory.removeService(existing);
+    }
   }
 
   /** Returns the fuel/EV battery service for `subtype`, creating it on first use. */
@@ -76,21 +121,23 @@ export class CarAccessory {
 
   /** Push a fresh reading from the car into HomeKit. */
   update(status: CarStatus): void {
-    const locked =
-      status.lock === DoorLockStatusVehicle.INTERNAL_LOCKED || status.lock === DoorLockStatusVehicle.EXTERNAL_LOCKED;
-    const lockUnknown = status.lock === null;
-    const currentLockState = lockUnknown
-      ? this.Characteristic.LockCurrentState.UNKNOWN
-      : locked
-        ? this.Characteristic.LockCurrentState.SECURED
-        : this.Characteristic.LockCurrentState.UNSECURED;
-    this.lockService.updateCharacteristic(this.Characteristic.LockCurrentState, currentLockState);
-    this.lockService.updateCharacteristic(
-      this.Characteristic.LockTargetState,
-      locked ? this.Characteristic.LockTargetState.SECURED : this.Characteristic.LockTargetState.UNSECURED,
-    );
+    if (this.lockService) {
+      const locked =
+        status.lock === DoorLockStatusVehicle.INTERNAL_LOCKED || status.lock === DoorLockStatusVehicle.EXTERNAL_LOCKED;
+      const lockUnknown = status.lock === null;
+      const currentLockState = lockUnknown
+        ? this.Characteristic.LockCurrentState.UNKNOWN
+        : locked
+          ? this.Characteristic.LockCurrentState.SECURED
+          : this.Characteristic.LockCurrentState.UNSECURED;
+      this.lockService.updateCharacteristic(this.Characteristic.LockCurrentState, currentLockState);
+      this.lockService.updateCharacteristic(
+        this.Characteristic.LockTargetState,
+        locked ? this.Characteristic.LockTargetState.SECURED : this.Characteristic.LockTargetState.UNSECURED,
+      );
+    }
 
-    if (status.doorsOpen !== null) {
+    if (this.doorsService && status.doorsOpen !== null) {
       this.doorsService.updateCharacteristic(
         this.Characteristic.ContactSensorState,
         status.doorsOpen
@@ -99,7 +146,7 @@ export class CarAccessory {
       );
     }
 
-    if (status.windowsOpen !== null) {
+    if (this.windowsService && status.windowsOpen !== null) {
       this.windowsService.updateCharacteristic(
         this.Characteristic.ContactSensorState,
         status.windowsOpen
@@ -108,14 +155,14 @@ export class CarAccessory {
       );
     }
 
-    if (status.lightsOn !== null) {
+    if (this.lightsService && status.lightsOn !== null) {
       this.lightsService.updateCharacteristic(this.Characteristic.On, status.lightsOn);
     }
 
     // Only add a battery service for whichever the car actually reports
     // (combustion cars report fuel only, EVs report SoC only, some hybrids
-    // report both).
-    if (status.fuelPercent !== null) {
+    // report both), and only if that service is enabled in config.
+    if (this.options.showFuelBattery && status.fuelPercent !== null) {
       const service = this.getOrAddBattery('fuel-battery', 'Fuel Level');
       service.updateCharacteristic(this.Characteristic.BatteryLevel, status.fuelPercent);
       service.updateCharacteristic(
@@ -126,7 +173,7 @@ export class CarAccessory {
       );
       service.updateCharacteristic(this.Characteristic.ChargingState, this.Characteristic.ChargingState.NOT_CHARGEABLE);
     }
-    if (status.evPercent !== null) {
+    if (this.options.showEvBattery && status.evPercent !== null) {
       const service = this.getOrAddBattery('ev-battery', 'EV Charge');
       service.updateCharacteristic(this.Characteristic.BatteryLevel, status.evPercent);
       service.updateCharacteristic(

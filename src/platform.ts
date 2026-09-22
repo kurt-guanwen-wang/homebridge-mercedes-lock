@@ -3,7 +3,7 @@ import { PLATFORM_NAME, PLUGIN_NAME } from './settings';
 import { MercedesOAuth } from './oauth';
 import { TokenCache } from './tokenCache';
 import { MercedesApi } from './mbApi';
-import { CarAccessory } from './carAccessory';
+import { CarAccessory, CarAccessoryOptions } from './carAccessory';
 import { Region } from './constants';
 
 interface MercedesLockConfig extends PlatformConfig {
@@ -12,6 +12,12 @@ interface MercedesLockConfig extends PlatformConfig {
   region: Region;
   vin?: string;
   pollIntervalSeconds?: number;
+  showLock?: boolean;
+  showDoors?: boolean;
+  showWindows?: boolean;
+  showLights?: boolean;
+  showFuelBattery?: boolean;
+  showEvBattery?: boolean;
 }
 
 export class MercedesLockPlatform implements DynamicPlatformPlugin {
@@ -66,7 +72,7 @@ export class MercedesLockPlatform implements DynamicPlatformPlugin {
       return;
     }
 
-    this.carAccessory = this.setupAccessory(this.vin);
+    this.carAccessory = this.setupAccessory(this.vin, cfg);
 
     const pollMs = Math.max(60, cfg.pollIntervalSeconds ?? 180) * 1000;
     await this.refresh();
@@ -80,7 +86,7 @@ export class MercedesLockPlatform implements DynamicPlatformPlugin {
     return vehicles[0]?.vin ?? null;
   }
 
-  private setupAccessory(vin: string): CarAccessory {
+  private setupAccessory(vin: string, cfg: MercedesLockConfig): CarAccessory {
     const uuid = this.api.hap.uuid.generate(`mercedes-lock-${vin}`);
     let accessory = this.accessories.find((a) => a.UUID === uuid);
 
@@ -89,7 +95,16 @@ export class MercedesLockPlatform implements DynamicPlatformPlugin {
       this.api.registerPlatformAccessories(PLUGIN_NAME, PLATFORM_NAME, [accessory]);
     }
 
-    return new CarAccessory(this.api, accessory);
+    const options: CarAccessoryOptions = {
+      showLock: cfg.showLock ?? true,
+      showDoors: cfg.showDoors ?? true,
+      showWindows: cfg.showWindows ?? true,
+      showLights: cfg.showLights ?? true,
+      showFuelBattery: cfg.showFuelBattery ?? true,
+      showEvBattery: cfg.showEvBattery ?? true,
+    };
+
+    return new CarAccessory(this.api, accessory, options);
   }
 
   private async refresh(): Promise<void> {

@@ -55,7 +55,13 @@ Configure via Homebridge UI (recommended) or `config.json`:
   "username": "your-dedicated-account@example.com",
   "password": "your-password",
   "region": "North America",
-  "pollIntervalSeconds": 180
+  "pollIntervalSeconds": 180,
+  "showLock": true,
+  "showDoors": true,
+  "showWindows": true,
+  "showLights": true,
+  "showFuelBattery": true,
+  "showEvBattery": true
 }
 ```
 
@@ -65,6 +71,17 @@ Configure via Homebridge UI (recommended) or `config.json`:
 | `region` | yes | `Europe`, `North America`, `Asia-Pacific`, or `China` |
 | `vin` | no | Set if the account has multiple vehicles; otherwise the first one is used |
 | `pollIntervalSeconds` | no | Default 180 |
+| `showLock` | no | Show the door lock service. Default `true` |
+| `showDoors` | no | Show the doors contact sensor. Default `true` |
+| `showWindows` | no | Show the windows/sunroof contact sensor. Default `true` |
+| `showLights` | no | Show the interior lights service. Default `true` |
+| `showFuelBattery` | no | Show fuel level (if reported by the car). Default `true` |
+| `showEvBattery` | no | Show EV charge level (if reported by the car). Default `true` |
+
+The Homebridge UI groups the `show*` toggles under a "HomeKit Services"
+section in the plugin settings form. Turning a toggle off removes that
+service from the accessory (including one restored from a previous
+Homebridge run) the next time the plugin starts.
 
 The OAuth token is cached to disk under Homebridge's storage directory, so
 you won't need to re-login on every restart until the refresh token
@@ -72,7 +89,8 @@ expires or login fails.
 
 ## What shows up in HomeKit
 
-One accessory named "Car (last 6 of VIN)" with several read-only services:
+One accessory named "Car (last 6 of VIN)" with several read-only services,
+each independently toggleable in config (see above):
 
 | Service | Reflects | Notes |
 |---|---|---|

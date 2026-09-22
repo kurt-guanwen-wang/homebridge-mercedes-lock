@@ -47,8 +47,54 @@
         "type": "integer",
         "default": 180,
         "minimum": 60,
-        "description": "How often to fetch the latest door lock status. Matches Mercedes' own app polling interval; do not set too low to avoid rate limiting / account flags."
+        "description": "How often to fetch the latest vehicle status. Matches Mercedes' own app polling interval; do not set too low to avoid rate limiting / account flags."
+      },
+      "showLock": {
+        "title": "Show Door Lock",
+        "type": "boolean",
+        "default": true
+      },
+      "showDoors": {
+        "title": "Show Doors Sensor",
+        "type": "boolean",
+        "default": true
+      },
+      "showWindows": {
+        "title": "Show Windows Sensor",
+        "type": "boolean",
+        "default": true
+      },
+      "showLights": {
+        "title": "Show Interior Lights",
+        "type": "boolean",
+        "default": true
+      },
+      "showFuelBattery": {
+        "title": "Show Fuel Level",
+        "type": "boolean",
+        "default": true,
+        "description": "Only created if the car actually reports a fuel level (combustion/hybrid)."
+      },
+      "showEvBattery": {
+        "title": "Show EV Charge Level",
+        "type": "boolean",
+        "default": true,
+        "description": "Only created if the car actually reports an EV state of charge (EV/hybrid)."
       }
     }
-  }
+  },
+  "layout": [
+    "name",
+    "username",
+    "password",
+    "region",
+    "vin",
+    "pollIntervalSeconds",
+    {
+      "type": "fieldset",
+      "title": "HomeKit Services",
+      "description": "Turn off anything you don't want shown in the Home app. Fuel/EV level services are only created when the car actually reports that data, even if enabled here.",
+      "items": ["showLock", "showDoors", "showWindows", "showLights", "showFuelBattery", "showEvBattery"]
+    }
+  ]
 }
