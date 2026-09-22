@@ -1,3 +1,10 @@
+## [0.2.1](https://github.com/kurt-guanwen-wang/homebridge-mercedes-lock/compare/v0.2.0...v0.2.1) (2026-09-22)
+
+
+### Bug Fixes
+
+* update test-login.ts for the new getVehicleStatus API ([731af14](https://github.com/kurt-guanwen-wang/homebridge-mercedes-lock/commit/731af1470cd74c5c96c8db19f8a2efbd59d2aeb9))
+
 # [0.2.0](https://github.com/kurt-guanwen-wang/homebridge-mercedes-lock/compare/v0.1.0...v0.2.0) (2026-09-22)
 
 
