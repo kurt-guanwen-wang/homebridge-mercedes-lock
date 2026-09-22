@@ -1,3 +1,10 @@
+# 1.0.0 (2026-09-22)
+
+
+### Features
+
+* build Mercedes-Benz HomeKit lock/status plugin ([a72d17f](https://github.com/kurt-guanwen-wang/homebridge-mercedes-lock/commit/a72d17f7ebb2b5ed5849781c8e47940f47fb81aa))
+
 ## [0.2.3](https://github.com/kurt-guanwen-wang/homebridge-mercedes-lock/compare/v0.2.2...v0.2.3) (2026-09-22)
 
 
