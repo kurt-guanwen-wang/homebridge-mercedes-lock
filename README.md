@@ -69,7 +69,8 @@ Configure via Homebridge UI (recommended) or `config.json`:
   "showDoors": true,
   "showWindows": true,
   "showFuelBattery": true,
-  "showEvBattery": true
+  "showEvBattery": true,
+  "debug": false
 }
 ```
 
@@ -84,6 +85,7 @@ Configure via Homebridge UI (recommended) or `config.json`:
 | `showWindows` | no | Show the windows/sunroof contact sensor. Default `true` |
 | `showFuelBattery` | no | Show fuel level (if reported by the car). Default `true` |
 | `showEvBattery` | no | Show EV charge level (if reported by the car). Default `true` |
+| `debug` | no | Log detailed OAuth/REST/websocket diagnostics as regular (always-visible) log lines, without needing Homebridge's own debug mode enabled. Default `false` |
 
 The Homebridge UI groups the `show*` toggles under a "HomeKit Services"
 section in the plugin settings form. Turning a toggle off removes that

@@ -7,6 +7,7 @@ import { MercedesWebSocket } from './websocket';
 import { CarAccessory, CarAccessoryOptions } from './carAccessory';
 import { CarStatus } from './vehicleStatus';
 import { Region } from './constants';
+import { createLogger, Logger } from './logger';
 
 interface MercedesLockConfig extends PlatformConfig {
   username: string;
@@ -19,6 +20,7 @@ interface MercedesLockConfig extends PlatformConfig {
   showWindows?: boolean;
   showFuelBattery?: boolean;
   showEvBattery?: boolean;
+  debug?: boolean;
 }
 
 export class MercedesLockPlatform implements DynamicPlatformPlugin {
@@ -34,6 +36,7 @@ export class MercedesLockPlatform implements DynamicPlatformPlugin {
   private startRetryTimer: NodeJS.Timeout | null = null;
   private startRetryDelayMs = MercedesLockPlatform.START_RETRY_INITIAL_MS;
   private lastStatus: CarStatus | null = null;
+  private debugLog!: Logger;
 
   constructor(
     private readonly log: Logging,
@@ -94,27 +97,31 @@ export class MercedesLockPlatform implements DynamicPlatformPlugin {
   private async start(): Promise<void> {
     const cfg = this.config as MercedesLockConfig;
     const region: Region = cfg.region ?? 'North America';
+    this.debugLog = createLogger(this.log, cfg.debug ?? false);
+    if (cfg.debug) {
+      this.log.info('MercedesLock: debug logging enabled via plugin config');
+    }
     const oauth = new MercedesOAuth(
       cfg.username,
       cfg.password,
       region,
-      new TokenCache(this.api.user.storagePath(), this.hashAccount(cfg.username), this.log),
-      this.log,
+      new TokenCache(this.api.user.storagePath(), this.hashAccount(cfg.username), this.debugLog),
+      this.debugLog,
     );
-    this.api2 = new MercedesApi(oauth, region, this.log);
+    this.api2 = new MercedesApi(oauth, region, this.debugLog);
 
     this.vin = cfg.vin?.trim() || (await this.discoverVin());
     if (!this.vin) {
       throw new Error('No vehicles found on this Mercedes Me account.');
     }
-    this.log.debug('MercedesLock: using VIN %s (region=%s)', this.vin, region);
+    this.debugLog.debug('MercedesLock: using VIN %s (region=%s)', this.vin, region);
 
     this.carAccessory = this.setupAccessory(this.vin, cfg);
 
     // Lock/door/window status is only ever delivered over the websocket
     // push channel (the REST snapshot below only has fuel/range/position),
     // so it's the primary, real-time data source.
-    this.websocket = new MercedesWebSocket(oauth, region, this.log, (vin, status) => {
+    this.websocket = new MercedesWebSocket(oauth, region, this.debugLog, (vin, status) => {
       if (vin !== this.vin) {
         return;
       }
@@ -134,7 +141,7 @@ export class MercedesLockPlatform implements DynamicPlatformPlugin {
     } catch (err) {
       this.log.warn('Initial status refresh failed (will retry on next poll): %s', (err as Error).message);
     }
-    this.log.debug('MercedesLock: polling REST status every %ds', pollMs / 1000);
+    this.debugLog.debug('MercedesLock: polling REST status every %ds', pollMs / 1000);
     this.pollTimer = setInterval(() => {
       this.refresh().catch((err) => this.log.warn('Poll failed: %s', (err as Error).message));
     }, pollMs);
@@ -199,7 +206,7 @@ export class MercedesLockPlatform implements DynamicPlatformPlugin {
     };
     this.lastStatus = merged;
     this.carAccessory.update(merged);
-    this.log.debug('Vehicle status: %j', merged);
+    this.debugLog.debug('Vehicle status: %j', merged);
   }
 
   private hashAccount(username: string): string {

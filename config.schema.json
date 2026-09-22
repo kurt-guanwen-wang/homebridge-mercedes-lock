@@ -75,6 +75,12 @@
         "type": "boolean",
         "default": true,
         "description": "Only created if the car actually reports an EV state of charge (EV/hybrid)."
+      },
+      "debug": {
+        "title": "Debug Logging",
+        "type": "boolean",
+        "default": false,
+        "description": "Log detailed OAuth/REST/websocket diagnostics (as regular log lines, not gated behind Homebridge's own debug mode) - useful for troubleshooting login or status issues. Never logs your password."
       }
     }
   },
@@ -90,6 +96,7 @@
       "title": "HomeKit Services",
       "description": "Turn off anything you don't want shown in the Home app. Fuel/EV level services are only created when the car actually reports that data, even if enabled here.",
       "items": ["showLock", "showDoors", "showWindows", "showFuelBattery", "showEvBattery"]
-    }
+    },
+    "debug"
   ]
 }
