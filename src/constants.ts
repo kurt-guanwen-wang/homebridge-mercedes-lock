@@ -86,6 +86,35 @@ export function webApiUserAgent(region: Region): string {
   return region === 'China' ? WEBAPI_USER_AGENT_CN : WEBAPI_USER_AGENT;
 }
 
+/**
+ * The websocket connection uses a *different* User-Agent than plain REST
+ * calls for North America/Asia-Pacific: a templated string embedding the
+ * app version, rather than the generic CFNetwork string (app_version.py's
+ * `websocket_user_agent()`). Europe/China reuse the same static string as
+ * their webapi User-Agent.
+ */
+export function websocketUserAgent(region: Region): string {
+  const version = applicationVersion(region);
+  if (region === 'North America') {
+    return `mycar-store-us v${version}, ${RIS_OS_NAME} ${RIS_OS_VERSION}, SDK ${sdkVersion(region)}`;
+  }
+  if (region === 'Asia-Pacific') {
+    return `mycar-store-ap ${version}, ${RIS_OS_NAME} ${RIS_OS_VERSION}, SDK ${sdkVersion(region)}`;
+  }
+  return webApiUserAgent(region);
+}
+
+const WEBSOCKET_API_BASE: Record<Region, string> = {
+  Europe: 'wss://websocket.emea-prod.mobilesdk.mercedes-benz.com/v2/ws',
+  'North America': 'wss://websocket.amap-prod.mobilesdk.mercedes-benz.com/v2/ws',
+  'Asia-Pacific': 'wss://websocket.amap-prod.mobilesdk.mercedes-benz.com/v2/ws',
+  China: 'wss://websocket.cn-prod.mobilesdk.mercedes-benz.com/v2/ws',
+};
+
+export function websocketUrl(region: Region): string {
+  return WEBSOCKET_API_BASE[region];
+}
+
 export const RIS_OS_NAME = 'ios';
 export const RIS_OS_VERSION = '26.3';
 
@@ -103,41 +132,20 @@ export enum DoorLockStatusVehicle {
   SELECTIVE_UNLOCKED = 3,
 }
 
-export const DOOR_LOCK_ATTRIBUTE_KEY = 'doorlockstatusvehicle';
-
-/**
- * doorstatus{position} / decklidstatus proto enum values, shared across all
- * per-door attributes (vsu_enums.py: DOORSTATUS_CLOSED/OPEN). Verified
- * against seydx/homebridge-mercedesme's binary_sensor door handler and
- * ReneNulschDE/mbapi2020's binary_sensor.py.
- */
-export enum DoorStatus {
-  CLOSED = 0,
-  OPEN = 1,
+/** DoorStatusOverallEnumAttribute proto enum values. */
+export enum DoorStatusOverall {
+  ANY_DOOR_OPEN = 0,
+  ALL_DOORS_CLOSED = 1,
+  UNKNOWN = 3,
 }
 
-export const DOOR_STATUS_ATTRIBUTE_KEYS = [
-  'doorstatusfrontleft',
-  'doorstatusfrontright',
-  'doorstatusrearleft',
-  'doorstatusrearright',
-  'decklidstatus',
-] as const;
-
-/** windowstatus{position} proto enum values (vsu_enums.py: WINDOWSTATUS_*). */
-export enum WindowStatus {
-  INTERMEDIATE = 0,
-  COMPLETELY_OPENED = 1,
-  COMPLETELY_CLOSED = 2,
-  AIRING_POSITION = 3,
+/** WindowStatusOverallEnumAttribute proto enum values. */
+export enum WindowStatusOverall {
+  OPEN = 0,
+  CLOSED = 1,
+  COMPLETELY_OPEN = 2,
+  AIRING = 3,
 }
-
-export const WINDOW_STATUS_ATTRIBUTE_KEYS = [
-  'windowstatusfrontleft',
-  'windowstatusfrontright',
-  'windowstatusrearleft',
-  'windowstatusrearright',
-] as const;
 
 /** sunroofstatus proto enum values (vsu_enums.py: SUNROOFSTATUS_*). */
 export enum SunroofStatus {
@@ -147,17 +155,21 @@ export enum SunroofStatus {
   RUNNING = 3,
 }
 
-export const SUNROOF_STATUS_ATTRIBUTE_KEY = 'sunroofstatus';
-
-/** Fuel tank level, 0-100 (int_value). Present on combustion/hybrid vehicles. */
-export const FUEL_LEVEL_ATTRIBUTE_KEY = 'tanklevelpercent';
-
-/** EV state of charge, 0-100 (int_value). Present on EV/hybrid vehicles. */
-export const EV_SOC_ATTRIBUTE_KEY = 'soc';
-
 /**
- * Interior light attributes are booleans (bool_value), unlike the
- * enum-based door/window/sunroof statuses above - confirmed via
- * vsu_enums.py having no INTERIORLIGHTS or READINGLAMP enum entries.
+ * VehicleStatusUpdate field numbers, verified directly against the
+ * compiled Python descriptors in
+ * custom_components/mbapi2020/proto/vehicle_events_pb2.py
+ * (VehicleStatusUpdate message). This is the flat, one-field-per-attribute
+ * message returned by both the `/v1/vehicle/{vin}/vehicleattributes` REST
+ * endpoint and the `vehicle_status_updates` websocket push message - *not*
+ * the generic string-keyed attribute map (VEPUpdate) used elsewhere in the
+ * protocol.
  */
-export const INTERIOR_LIGHT_ATTRIBUTE_KEYS = ['interiorLightsFront', 'interiorLightsRear'] as const;
+export const VSU_FIELD = {
+  doorlockstatusvehicle: 74,
+  doorStatusOverall: 266,
+  windowStatusOverall: 272,
+  sunroofstatus: 212,
+  soc: 196,
+  tanklevelpercent: 214,
+} as const;

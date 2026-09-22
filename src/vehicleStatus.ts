@@ -1,24 +1,12 @@
-import {
-  DOOR_LOCK_ATTRIBUTE_KEY,
-  DOOR_STATUS_ATTRIBUTE_KEYS,
-  DoorLockStatusVehicle,
-  DoorStatus,
-  EV_SOC_ATTRIBUTE_KEY,
-  FUEL_LEVEL_ATTRIBUTE_KEY,
-  INTERIOR_LIGHT_ATTRIBUTE_KEYS,
-  SUNROOF_STATUS_ATTRIBUTE_KEY,
-  SunroofStatus,
-  WINDOW_STATUS_ATTRIBUTE_KEYS,
-  WindowStatus,
-} from './constants';
-import { AttributeReading } from './proto';
+import { DoorLockStatusVehicle, DoorStatusOverall, SunroofStatus, WindowStatusOverall } from './constants';
+import { RawVehicleStatus } from './proto';
 
 /**
- * A single vehicle "snapshot" derived from the raw attribute map, using the
- * same per-attribute semantics ReneNulschDE/mbapi2020's binary_sensor.py /
- * lock.py and seydx/homebridge-mercedesme's accessory.js apply. Any field is
- * `null` when the car didn't report that attribute (e.g. no EV battery on a
- * combustion vehicle) or reported it as INVALID/NOT_AVAILABLE.
+ * A single vehicle "snapshot" derived from a decoded VehicleStatusUpdate,
+ * using the same per-attribute semantics ReneNulschDE/mbapi2020's lock.py
+ * applies. Any field is `null` when the car didn't report that attribute
+ * (e.g. no EV battery on a combustion vehicle) or reported it as
+ * INVALID/NOT_AVAILABLE.
  */
 export interface CarStatus {
   lock: DoorLockStatusVehicle | null;
@@ -30,52 +18,25 @@ export interface CarStatus {
   fuelPercent: number | null;
   /** EV state of charge, 0-100. Present on EV/hybrid vehicles. */
   evPercent: number | null;
-  /** true if any interior light is on. */
-  lightsOn: boolean | null;
 }
 
-function numberValue(attrs: Record<string, AttributeReading>, key: string): number | null {
-  const v = attrs[key]?.value;
-  return typeof v === 'number' ? v : null;
-}
+export function interpretCarStatus(raw: RawVehicleStatus): CarStatus {
+  const lock = raw.lock.value === null ? null : (raw.lock.value as DoorLockStatusVehicle);
 
-function boolValue(attrs: Record<string, AttributeReading>, key: string): boolean | null {
-  const v = attrs[key]?.value;
-  return typeof v === 'boolean' ? v : null;
-}
+  const doorsOpen =
+    raw.doorStatusOverall.value === null ? null : raw.doorStatusOverall.value === DoorStatusOverall.ANY_DOOR_OPEN;
 
-/** true if `some` returns true for the given keys, false if all are closed, null if none present. */
-function anyOpen<T extends readonly string[]>(
-  attrs: Record<string, AttributeReading>,
-  keys: T,
-  isOpen: (value: number) => boolean,
-): boolean | null {
-  const values = keys.map((k) => numberValue(attrs, k)).filter((v): v is number => v !== null);
-  if (values.length === 0) {
-    return null;
-  }
-  return values.some(isOpen);
-}
-
-export function interpretCarStatus(attrs: Record<string, AttributeReading>): CarStatus {
-  const lockRaw = numberValue(attrs, DOOR_LOCK_ATTRIBUTE_KEY);
-  const lock = lockRaw === null ? null : (lockRaw as DoorLockStatusVehicle);
-
-  const doorsOpen = anyOpen(attrs, DOOR_STATUS_ATTRIBUTE_KEYS, (v) => v === DoorStatus.OPEN);
-
-  const windowsAnyOpen = anyOpen(attrs, WINDOW_STATUS_ATTRIBUTE_KEYS, (v) => v !== WindowStatus.COMPLETELY_CLOSED);
-  const sunroof = numberValue(attrs, SUNROOF_STATUS_ATTRIBUTE_KEY);
+  const windowOverall = raw.windowStatusOverall.value;
+  const windowsOpenFromWindows = windowOverall === null ? null : windowOverall !== WindowStatusOverall.CLOSED;
+  const sunroof = raw.sunroofstatus.value;
   const sunroofOpen = sunroof === null ? null : sunroof !== SunroofStatus.CLOSED;
   const windowsOpen =
-    windowsAnyOpen === null && sunroofOpen === null ? null : Boolean(windowsAnyOpen) || Boolean(sunroofOpen);
+    windowsOpenFromWindows === null && sunroofOpen === null
+      ? null
+      : Boolean(windowsOpenFromWindows) || Boolean(sunroofOpen);
 
-  const fuelPercent = numberValue(attrs, FUEL_LEVEL_ATTRIBUTE_KEY);
-  const evPercent = numberValue(attrs, EV_SOC_ATTRIBUTE_KEY);
+  const fuelPercent = raw.tanklevelpercent.value;
+  const evPercent = raw.soc.value;
 
-  const lightValues = INTERIOR_LIGHT_ATTRIBUTE_KEYS.map((k) => boolValue(attrs, k)).filter(
-    (v): v is boolean => v !== null,
-  );
-  const lightsOn = lightValues.length ? lightValues.some((v) => v) : null;
-
-  return { lock, doorsOpen, windowsOpen, fuelPercent, evPercent, lightsOn };
+  return { lock, doorsOpen, windowsOpen, fuelPercent, evPercent };
 }

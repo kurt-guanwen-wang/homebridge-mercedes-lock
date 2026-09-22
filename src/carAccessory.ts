@@ -7,7 +7,6 @@ export interface CarAccessoryOptions {
   showLock: boolean;
   showDoors: boolean;
   showWindows: boolean;
-  showLights: boolean;
   showFuelBattery: boolean;
   showEvBattery: boolean;
 }
@@ -16,21 +15,20 @@ export interface CarAccessoryOptions {
  * A single HomeKit "device" for the car, exposing everything as separate
  * read-only services on one PlatformAccessory (matches how
  * seydx/homebridge-mercedesme grouped car.js's services under one
- * accessory): door lock, doors, windows, interior lights, and (if
- * applicable) fuel/EV battery level. Each service is independently
- * toggleable via `CarAccessoryOptions`; disabled services are removed from
- * the accessory (including previously cached ones) so they don't linger.
+ * accessory): door lock, doors, windows, and (if applicable) fuel/EV
+ * battery level. Each service is independently toggleable via
+ * `CarAccessoryOptions`; disabled services are removed from the accessory
+ * (including previously cached ones) so they don't linger.
  *
- * All writable characteristics (LockTargetState, the lights' On) are
- * intentionally no-ops that snap back to the last known reading - this
- * plugin never sends commands to the car.
+ * All writable characteristics (LockTargetState) are intentionally no-ops
+ * that snap back to the last known reading - this plugin never sends
+ * commands to the car.
  */
 export class CarAccessory {
   private readonly Characteristic: typeof Characteristic;
   private lockService: Service | null = null;
   private doorsService: Service | null = null;
   private windowsService: Service | null = null;
-  private lightsService: Service | null = null;
   private fuelBatteryService: Service | null = null;
   private evBatteryService: Service | null = null;
 
@@ -72,19 +70,7 @@ export class CarAccessory {
       this.removeServiceById(Service.ContactSensor, 'windows');
     }
 
-    if (options.showLights) {
-      this.lightsService =
-        this.accessory.getServiceById(Service.Lightbulb, 'lights') ??
-        this.accessory.addService(Service.Lightbulb, 'Interior Lights', 'lights');
-      this.lightsService.getCharacteristic(this.Characteristic.On).onSet((value) => {
-        const service = this.lightsService!;
-        const current = service.getCharacteristic(this.Characteristic.On).value ?? false;
-        setImmediate(() => service.updateCharacteristic(this.Characteristic.On, current));
-        void value;
-      });
-    } else {
-      this.removeServiceById(Service.Lightbulb, 'lights');
-    }
+    this.removeServiceById(Service.Lightbulb, 'lights');
 
     if (!options.showFuelBattery) {
       this.removeServiceById(Service.Battery, 'fuel-battery');
@@ -153,10 +139,6 @@ export class CarAccessory {
           ? this.Characteristic.ContactSensorState.CONTACT_NOT_DETECTED
           : this.Characteristic.ContactSensorState.CONTACT_DETECTED,
       );
-    }
-
-    if (this.lightsService && status.lightsOn !== null) {
-      this.lightsService.updateCharacteristic(this.Characteristic.On, status.lightsOn);
     }
 
     // Only add a battery service for whichever the car actually reports

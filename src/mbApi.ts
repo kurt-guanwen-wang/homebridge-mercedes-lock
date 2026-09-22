@@ -12,7 +12,7 @@ import {
   webApiUserAgent,
   widgetBaseUrl,
 } from './constants';
-import { decodeVehicleAttributes } from './proto';
+import { decodeVehicleStatusUpdate } from './proto';
 import { CarStatus, interpretCarStatus } from './vehicleStatus';
 
 export interface Vehicle {
@@ -77,10 +77,16 @@ export class MercedesApi {
   }
 
   /**
-   * Fetches every reported vehicle attribute in a single call (lock,
-   * doors, windows, fuel/EV level, interior lights) and interprets them
-   * into a typed CarStatus. Ported from mbapi2020's webapi.py
-   * `get_car_p2b_data_via_rest`.
+   * Fetches the REST "widget" attribute snapshot for a vehicle - fuel tank
+   * level, EV state of charge, range and position. Ported from
+   * mbapi2020's webapi.py `get_car_p2b_data_via_rest`.
+   *
+   * Note: this endpoint does *not* report lock/door/window status (only a
+   * generic widget dataset) - those fields require the websocket
+   * connection's `vehicle_status_updates` push (see MercedesWebSocket).
+   * Callers should treat this as an initial best-effort fill of
+   * fuel/EV level only; lock/doors/windows on the returned CarStatus will
+   * be null until a websocket update arrives.
    */
   async getVehicleStatus(vin: string): Promise<CarStatus> {
     const res = await request(`${widgetBaseUrl(this.region)}/v1/vehicle/${vin}/vehicleattributes`, {
@@ -92,6 +98,6 @@ export class MercedesApi {
       throw new Error(`Failed to fetch vehicle attributes: HTTP ${res.statusCode} - ${text}`);
     }
     const buffer = Buffer.from(await res.body.arrayBuffer());
-    return interpretCarStatus(decodeVehicleAttributes(buffer));
+    return interpretCarStatus(decodeVehicleStatusUpdate(buffer));
   }
 }

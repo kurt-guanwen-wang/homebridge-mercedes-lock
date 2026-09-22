@@ -1,33 +1,60 @@
 import * as protobuf from 'protobufjs';
+import { VSU_FIELD } from './constants';
 
 /**
  * Minimal subset of mbapi2020's vehicle-events.proto (package `proto`),
  * field numbers verified directly against the compiled Python descriptors
- * in custom_components/mbapi2020/proto/vehicle_events_pb2.py. Only the
- * fields this plugin reads are declared - protobuf safely ignores
- * undeclared/unknown fields on decode, so trimming these does not risk
- * decode errors.
+ * in custom_components/mbapi2020/proto/vehicle_events_pb2.py.
  *
- * `int_value` and `bool_value` are members of the same protobuf `oneof`
- * (verified via FieldDescriptor.containing_oneof), so at most one of them
- * is ever present on a given attribute - which one depends on the
- * attribute's proto type (enum-like statuses use int_value, plain
- * booleans like interior lights use bool_value).
+ * Both the `/v1/vehicle/{vin}/vehicleattributes` REST endpoint and the
+ * `vehicle_status_updates` websocket push message return a
+ * `VehicleStatusUpdate`: a *flat* message with one distinctly-numbered
+ * field per named attribute (verified by decoding a real payload with the
+ * genuine Python protobuf descriptors) - not the generic string-keyed
+ * attribute map (`VEPUpdate.attributes`) an earlier version of this file
+ * assumed. Only the handful of fields this plugin reads are declared here;
+ * protobuf safely skips undeclared/unknown fields on decode.
  */
 const PROTO_SOURCE = `
 syntax = "proto3";
 package proto;
 
-message VEPUpdate {
-  map<string, VehicleAttributeStatus> attributes = 11;
+message VSUMetadata {
+  int32 status = 2;
 }
 
-message VehicleAttributeStatus {
-  int32 status = 3;
-  oneof attribute_type {
-    int64 int_value = 4;
-    bool bool_value = 5;
-  }
+message EnumAttribute {
+  int32 value = 1;
+  VSUMetadata metadata = 2;
+}
+
+message RatioAttribute {
+  int64 value = 1;
+  VSUMetadata metadata = 2;
+}
+
+message VehicleStatusUpdate {
+  string fin_or_vin = 1;
+  EnumAttribute doorlockstatusvehicle = ${VSU_FIELD.doorlockstatusvehicle};
+  EnumAttribute door_status_overall = ${VSU_FIELD.doorStatusOverall};
+  EnumAttribute window_status_overall = ${VSU_FIELD.windowStatusOverall};
+  EnumAttribute sunroofstatus = ${VSU_FIELD.sunroofstatus};
+  RatioAttribute soc = ${VSU_FIELD.soc};
+  RatioAttribute tanklevelpercent = ${VSU_FIELD.tanklevelpercent};
+}
+
+message VehicleStatusUpdatesEntry {
+  string key = 1;
+  VehicleStatusUpdate value = 2;
+}
+
+message VehicleStatusUpdates {
+  int64 sequence_number = 1;
+  repeated VehicleStatusUpdatesEntry vehicle_status_updates = 2;
+}
+
+message PushMessage {
+  VehicleStatusUpdates vehicle_status_updates = 24;
 }
 `;
 
@@ -39,59 +66,119 @@ function getRoot(): protobuf.Root {
   return root;
 }
 
-export interface AttributeReading {
-  /** int_value or bool_value, or null if not present/invalid. */
-  value: number | boolean | null;
-  /** VehicleAttributeStatus.status; per mbapi2020 this must be VALID (0) to trust `value`. */
-  status: number | null;
-}
-
 // protobufjs represents int64 fields with the `long` package's Long type.
 type Long = { toNumber(): number };
 
-interface RawAttribute {
-  intValue?: number | Long;
-  boolValue?: boolean;
-  status?: number;
-  /** protobufjs' virtual oneof discriminator: 'intValue', 'boolValue', or '' if neither was set on the wire. */
-  attributeType?: string;
+interface RawEnumAttribute {
+  value?: number;
+  metadata?: { status?: number };
+}
+
+interface RawRatioAttribute {
+  value?: number | Long;
+  metadata?: { status?: number };
+}
+
+interface RawVehicleStatusUpdate {
+  doorlockstatusvehicle?: RawEnumAttribute;
+  doorStatusOverall?: RawEnumAttribute;
+  windowStatusOverall?: RawEnumAttribute;
+  sunroofstatus?: RawEnumAttribute;
+  soc?: RawRatioAttribute;
+  tanklevelpercent?: RawRatioAttribute;
+}
+
+/** A single reported attribute value, or null if missing/invalid. */
+export interface RawReading {
+  value: number | null;
+}
+
+/** The subset of VehicleStatusUpdate fields this plugin cares about. */
+export interface RawVehicleStatus {
+  lock: RawReading;
+  doorStatusOverall: RawReading;
+  windowStatusOverall: RawReading;
+  sunroofstatus: RawReading;
+  soc: RawReading;
+  tanklevelpercent: RawReading;
 }
 
 /**
- * Decodes a VEPUpdate protobuf payload (as returned by the
- * `/v1/vehicle/{vin}/vehicleattributes` REST endpoint) into a plain map of
- * attribute key -> reading, for every attribute the car reported.
+ * VSUMetadata.status: 0 = VALUE_VALID, 1 = VALUE_NOT_RECEIVED,
+ * 3 = VALUE_INVALID, 4 = VALUE_NOT_AVAILABLE. Only trust a value when it's
+ * actually valid (vsu_helper.py).
  */
-export function decodeVehicleAttributes(buffer: Buffer): Record<string, AttributeReading> {
-  const VEPUpdate = getRoot().lookupType('proto.VEPUpdate');
-  const message = VEPUpdate.decode(buffer) as unknown as {
-    attributes: Record<string, RawAttribute>;
-  };
+function isValid(status: number | undefined): boolean {
+  return (status ?? 0) === 0;
+}
 
-  const result: Record<string, AttributeReading> = {};
-  for (const [key, attr] of Object.entries(message.attributes ?? {})) {
-    const status = attr.status ?? 0;
-    // status 0 = VALID; 3 = INVALID; 4 = NOT_AVAILABLE (vsu_helper.py). Only
-    // trust the value when the attribute is actually valid.
-    if (status !== 0) {
-      result[key] = { value: null, status };
-      continue;
-    }
-
-    // `int_value`/`bool_value` are proto3 scalars inside a `oneof`, so both
-    // are always present on the decoded message with their zero-value
-    // default (0 / false) - checking `!== undefined` would always be true.
-    // The oneof's virtual discriminator (`attributeType`) tells us which
-    // one was actually set on the wire.
-    if (attr.attributeType === 'boolValue') {
-      result[key] = { value: attr.boolValue ?? null, status };
-    } else if (attr.attributeType === 'intValue') {
-      const raw = attr.intValue;
-      const value = raw === undefined ? null : typeof raw === 'number' ? raw : (raw as Long).toNumber();
-      result[key] = { value, status };
-    } else {
-      result[key] = { value: null, status };
-    }
+function readEnum(attr: RawEnumAttribute | undefined): RawReading {
+  if (!attr || !isValid(attr.metadata?.status)) {
+    return { value: null };
   }
-  return result;
+  return { value: attr.value ?? null };
+}
+
+function readRatio(attr: RawRatioAttribute | undefined): RawReading {
+  if (!attr || !isValid(attr.metadata?.status)) {
+    return { value: null };
+  }
+  const raw = attr.value;
+  const value = raw === undefined ? null : typeof raw === 'number' ? raw : (raw as Long).toNumber();
+  return { value };
+}
+
+function extractRawStatus(decoded: RawVehicleStatusUpdate): RawVehicleStatus {
+  return {
+    lock: readEnum(decoded.doorlockstatusvehicle),
+    doorStatusOverall: readEnum(decoded.doorStatusOverall),
+    windowStatusOverall: readEnum(decoded.windowStatusOverall),
+    sunroofstatus: readEnum(decoded.sunroofstatus),
+    soc: readRatio(decoded.soc),
+    tanklevelpercent: readRatio(decoded.tanklevelpercent),
+  };
+}
+
+/**
+ * Decodes a single-vehicle VehicleStatusUpdate payload, as returned by the
+ * `/v1/vehicle/{vin}/vehicleattributes` REST endpoint.
+ */
+export function decodeVehicleStatusUpdate(buffer: Buffer): RawVehicleStatus {
+  const VehicleStatusUpdate = getRoot().lookupType('proto.VehicleStatusUpdate');
+  const decoded = VehicleStatusUpdate.decode(buffer) as unknown as RawVehicleStatusUpdate;
+  return extractRawStatus(decoded);
+}
+
+export interface DecodedVehicleStatusUpdates {
+  sequenceNumber: string;
+  vehicles: Map<string, RawVehicleStatus>;
+}
+
+interface RawPushMessage {
+  vehicleStatusUpdates?: {
+    sequenceNumber?: number | Long;
+    vehicleStatusUpdates?: Array<{ key: string; value: RawVehicleStatusUpdate }>;
+  };
+}
+
+/**
+ * Decodes a websocket PushMessage binary frame, returning the per-VIN
+ * status map if it's a `vehicle_status_updates` push (the only push
+ * message type this plugin needs), or null for any other message type
+ * (e.g. vepUpdate, debugMessage, assigned_vehicles - safely ignored).
+ */
+export function decodePushMessageVehicleStatusUpdates(buffer: Buffer): DecodedVehicleStatusUpdates | null {
+  const PushMessage = getRoot().lookupType('proto.PushMessage');
+  const decoded = PushMessage.decode(buffer) as unknown as RawPushMessage;
+  const vsu = decoded.vehicleStatusUpdates;
+  if (!vsu) {
+    return null;
+  }
+  const vehicles = new Map<string, RawVehicleStatus>();
+  for (const entry of vsu.vehicleStatusUpdates ?? []) {
+    vehicles.set(entry.key, extractRawStatus(entry.value));
+  }
+  const seq = vsu.sequenceNumber;
+  const sequenceNumber = seq === undefined ? '0' : typeof seq === 'number' ? String(seq) : String(seq as Long);
+  return { sequenceNumber, vehicles };
 }
