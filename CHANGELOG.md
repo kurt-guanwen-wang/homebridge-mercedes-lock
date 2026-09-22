@@ -1,3 +1,10 @@
+## [0.2.2](https://github.com/kurt-guanwen-wang/homebridge-mercedes-lock/compare/v0.2.1...v0.2.2) (2026-09-22)
+
+
+### Bug Fixes
+
+* send Mercedes app fingerprint headers on REST calls ([8a9ca7f](https://github.com/kurt-guanwen-wang/homebridge-mercedes-lock/commit/8a9ca7f29b31b8c010f97a6dbb80bfb048b4472e))
+
 ## [0.2.1](https://github.com/kurt-guanwen-wang/homebridge-mercedes-lock/compare/v0.2.0...v0.2.1) (2026-09-22)
 
 
