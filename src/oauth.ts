@@ -38,6 +38,15 @@ export class MercedesOAuth {
   // login at the same time.
   private inFlightToken: Promise<string> | null = null;
 
+  // Coalesces concurrent login() callers into a single in-flight PKCE
+  // flow. login() mutates shared instance state (codeVerifier,
+  // codeChallenge, cookie jar) that isn't safe to touch from two
+  // concurrent flows at once - without this, MercedesWebSocket's
+  // re-login-on-429 path (which calls login() directly, bypassing
+  // getAccessToken()'s inFlightToken dedup above) could race with a
+  // REST-poll-triggered login and corrupt each other's PKCE state.
+  private inFlightLogin: Promise<TokenInfo> | null = null;
+
   // Doubles after each full-login failure (wrong password, MFA newly
   // enabled, transient network issue, etc.) so repeated failures don't
   // hammer Mercedes' login endpoint and risk the account being flagged or
@@ -146,7 +155,21 @@ export class MercedesOAuth {
     return headers;
   }
 
+  /**
+   * Coalesces concurrent callers (see inFlightLogin above) into a single
+   * PKCE login flow rather than each starting their own.
+   */
   async login(): Promise<TokenInfo> {
+    if (this.inFlightLogin) {
+      return this.inFlightLogin;
+    }
+    this.inFlightLogin = this.loginInternal().finally(() => {
+      this.inFlightLogin = null;
+    });
+    return this.inFlightLogin;
+  }
+
+  private async loginInternal(): Promise<TokenInfo> {
     this.log.info('Starting Mercedes Me OAuth2 login (region=%s)', this.region);
     this.generatePkce();
     this.jar.set('CIAM.DEVICE', randomBytes(16).toString('hex'));
