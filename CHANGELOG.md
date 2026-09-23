@@ -1,3 +1,10 @@
+## [1.1.1](https://github.com/kurt-guanwen-wang/homebridge-mercedes-lock/compare/v1.1.0...v1.1.1) (2026-09-23)
+
+
+### Bug Fixes
+
+* recover from websocket 429 rate limiting instead of looping forever ([e83331f](https://github.com/kurt-guanwen-wang/homebridge-mercedes-lock/commit/e83331f0a5da013a9d45aa46145ca21bd3271bf4))
+
 # [1.1.0](https://github.com/kurt-guanwen-wang/homebridge-mercedes-lock/compare/v1.0.0...v1.1.0) (2026-09-22)
 
 
