@@ -1,6 +1,6 @@
 import WebSocket from 'ws';
 import { randomUUID } from 'node:crypto';
-import { MBAuth2FAError, MercedesOAuth } from './oauth';
+import { MBAuth2FAError, OAuthClient } from './oauth';
 import {
   applicationName,
   applicationVersion,
@@ -87,7 +87,7 @@ export class MercedesWebSocket {
   private readonly sessionId = randomUUID().toUpperCase();
 
   constructor(
-    private readonly oauth: MercedesOAuth,
+    private readonly oauth: OAuthClient,
     private readonly region: Region,
     private readonly log: Logger,
     private readonly onStatus: (vin: string, status: CarStatus) => void,
@@ -235,12 +235,29 @@ export class MercedesWebSocket {
       return;
     }
     if (this.reloginAttempts >= MAX_RELOGIN_ATTEMPTS) {
-      this.log.error(
-        'MercedesWebSocket: re-login attempts exhausted (%d/%d), not retrying login - check credentials/2FA',
-        this.reloginAttempts,
-        MAX_RELOGIN_ATTEMPTS,
-      );
-      return;
+      // Ported extension of mbapi2020's re-login-after-429: if this
+      // account has its own repeated-failure cutoff, rotate to the next
+      // configured Mercedes Me account (if more than one was provided -
+      // Mercedes allows up to 6 additional drivers per car) and reset the
+      // attempt counter so it gets its own full MAX_RELOGIN_ATTEMPTS
+      // budget rather than immediately being abandoned too.
+      if (this.oauth.advanceAccount?.()) {
+        this.log.warn(
+          'MercedesWebSocket: re-login attempts exhausted (%d/%d) on current account, rotating to the next configured account',
+          this.reloginAttempts,
+          MAX_RELOGIN_ATTEMPTS,
+        );
+        this.reloginAttempts = 0;
+        this.rateLimitStreak = 0;
+        this.reconnectDelayMs = INITIAL_RECONNECT_DELAY_MS;
+      } else {
+        this.log.error(
+          'MercedesWebSocket: re-login attempts exhausted (%d/%d), not retrying login - check credentials/2FA',
+          this.reloginAttempts,
+          MAX_RELOGIN_ATTEMPTS,
+        );
+        return;
+      }
     }
     this.reloginInFlight = true;
     this.reloginAttempts += 1;
@@ -254,9 +271,16 @@ export class MercedesWebSocket {
       })
       .catch((err) => {
         if (err instanceof MBAuth2FAError) {
-          // Can't be resolved by an automated re-login; stop trying.
+          // Can't be resolved by an automated re-login on this account;
+          // rotate to the next one immediately (if any) rather than
+          // burning through the remaining attempt budget on an account
+          // that will never succeed.
           this.log.error('MercedesWebSocket: re-login after 429 aborted, account requires 2FA: %s', err.message);
-          this.reloginAttempts = MAX_RELOGIN_ATTEMPTS;
+          if (this.oauth.advanceAccount?.()) {
+            this.reloginAttempts = 0;
+          } else {
+            this.reloginAttempts = MAX_RELOGIN_ATTEMPTS;
+          }
           return;
         }
         this.log.error(

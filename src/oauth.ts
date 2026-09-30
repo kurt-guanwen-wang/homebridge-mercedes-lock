@@ -14,6 +14,24 @@ interface Logger {
   error(msg: string, ...args: unknown[]): void;
 }
 
+/**
+ * Minimal shape shared by MercedesOAuth and AccountRotator, so
+ * MercedesApi/MercedesWebSocket don't need to know whether they're
+ * talking to a single account or a multi-account rotation.
+ */
+export interface OAuthClient {
+  getAccessToken(): Promise<string>;
+  login(): Promise<TokenInfo>;
+  /**
+   * Optional: rotates to the next configured Mercedes Me account (used
+   * when the current account gets persistently rate-limited). Returns
+   * `false` if there's only one account configured, i.e. there's nothing
+   * to rotate to. Implemented by AccountRotator only - plain
+   * MercedesOAuth has no other account to fall back to.
+   */
+  advanceAccount?(): boolean;
+}
+
 const LOGIN_BACKOFF_INITIAL_MS = 30_000; // 30s
 const LOGIN_BACKOFF_MAX_MS = 30 * 60_000; // 30min
 

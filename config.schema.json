@@ -2,7 +2,7 @@
   "pluginAlias": "MercedesLock",
   "pluginType": "platform",
   "singular": true,
-  "headerDisplay": "Shows your Mercedes-Benz vehicle's door lock, doors, windows, and fuel/EV level (read-only) in HomeKit. Logs in directly with your Mercedes Me account credentials \u2014 no Home Assistant required.\n\n**Security notes:** use a dedicated Mercedes Me account with MFA disabled for this plugin (invite it as an additional driver on your car). Do not use the same account simultaneously in the official Mercedes Me app.",
+  "headerDisplay": "Shows your Mercedes-Benz vehicle's door lock, doors, windows, and fuel/EV level (read-only) in HomeKit. Logs in directly with your Mercedes Me account credentials \u2014 no Home Assistant required.\n\n**Security notes:** use one or more dedicated Mercedes Me accounts with MFA disabled for this plugin (invite each as an additional driver on your car, up to 6). Do not use these accounts simultaneously in the official Mercedes Me app. If the current account gets rate-limited, the plugin automatically fails over to the next configured account.",
   "footerDisplay": "This plugin uses an unofficial, reverse-engineered API and is not affiliated with or endorsed by Mercedes-Benz. Use at your own risk \u2014 misuse may result in your Mercedes account being blocked.",
   "schema": {
     "type": "object",
@@ -13,17 +13,30 @@
         "default": "Mercedes Lock",
         "required": true
       },
-      "username": {
-        "title": "Mercedes Me Email",
-        "type": "string",
+      "accounts": {
+        "title": "Mercedes Me Accounts",
+        "type": "array",
+        "minItems": 1,
+        "maxItems": 6,
         "required": true,
-        "description": "Use a dedicated secondary account invited as an additional driver on your vehicle."
-      },
-      "password": {
-        "title": "Mercedes Me Password",
-        "type": "string",
-        "format": "password",
-        "required": true
+        "description": "At least 1 account is required; you may add up to 6. Mercedes allows up to 6 accounts to be invited as additional drivers on the same car - if the first account gets rate-limited, the plugin automatically fails over to the next one in this list, looping back to the first once all have been tried.",
+        "items": {
+          "type": "object",
+          "properties": {
+            "username": {
+              "title": "Mercedes Me Email",
+              "type": "string",
+              "required": true,
+              "description": "Use a dedicated secondary account invited as an additional driver on your vehicle."
+            },
+            "password": {
+              "title": "Mercedes Me Password",
+              "type": "string",
+              "format": "password",
+              "required": true
+            }
+          }
+        }
       },
       "region": {
         "title": "Region",
@@ -86,8 +99,13 @@
   },
   "layout": [
     "name",
-    "username",
-    "password",
+    {
+      "type": "array",
+      "key": "accounts",
+      "title": "Mercedes Me Accounts",
+      "description": "At least 1 account is required, up to 6. The plugin logs in with the first account and automatically switches to the next one in this list if the current account gets rate-limited by Mercedes, looping back to the first once all have been tried.",
+      "items": ["accounts[].username", "accounts[].password"]
+    },
     "region",
     "vin",
     "pollIntervalSeconds",

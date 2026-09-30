@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { request } from 'undici';
-import { MercedesOAuth } from './oauth';
+import { OAuthClient } from './oauth';
 import {
   applicationName,
   applicationVersion,
@@ -35,7 +35,7 @@ export class MercedesApi {
   private readonly sessionId = randomUUID().toUpperCase();
 
   constructor(
-    private readonly oauth: MercedesOAuth,
+    private readonly oauth: OAuthClient,
     private readonly region: Region,
     private readonly log: Logger = noopLogger,
   ) {}

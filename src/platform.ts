@@ -1,6 +1,7 @@
 import type { API, DynamicPlatformPlugin, Logging, PlatformAccessory, PlatformConfig } from 'homebridge';
 import { PLATFORM_NAME, PLUGIN_NAME } from './settings';
 import { MercedesOAuth } from './oauth';
+import { AccountRotator } from './accountRotator';
 import { TokenCache } from './tokenCache';
 import { MercedesApi } from './mbApi';
 import { MercedesWebSocket } from './websocket';
@@ -9,9 +10,17 @@ import { CarStatus } from './vehicleStatus';
 import { Region } from './constants';
 import { createLogger, Logger } from './logger';
 
-interface MercedesLockConfig extends PlatformConfig {
+interface MercedesAccountConfig {
   username: string;
   password: string;
+}
+
+interface MercedesLockConfig extends PlatformConfig {
+  /** @deprecated superseded by `accounts`; kept for back-compat with pre-multi-account configs. */
+  username?: string;
+  /** @deprecated superseded by `accounts`; kept for back-compat with pre-multi-account configs. */
+  password?: string;
+  accounts?: MercedesAccountConfig[];
   region: Region;
   vin?: string;
   pollIntervalSeconds?: number;
@@ -43,8 +52,8 @@ export class MercedesLockPlatform implements DynamicPlatformPlugin {
     private readonly config: PlatformConfig,
     private readonly api: API,
   ) {
-    if (!this.config.username || !this.config.password) {
-      this.log.error('MercedesLock: username/password not configured, plugin disabled.');
+    if (this.resolveAccounts(this.config as MercedesLockConfig).length === 0) {
+      this.log.error('MercedesLock: no Mercedes Me account configured (need at least 1, up to 6), plugin disabled.');
       return;
     }
 
@@ -101,13 +110,22 @@ export class MercedesLockPlatform implements DynamicPlatformPlugin {
     if (cfg.debug) {
       this.log.info('MercedesLock: debug logging enabled via plugin config');
     }
-    const oauth = new MercedesOAuth(
-      cfg.username,
-      cfg.password,
-      region,
-      new TokenCache(this.api.user.storagePath(), this.hashAccount(cfg.username), this.debugLog),
+    const oauth = new AccountRotator(
+      this.resolveAccounts(cfg).map(
+        (acc) =>
+          new MercedesOAuth(
+            acc.username,
+            acc.password,
+            region,
+            new TokenCache(this.api.user.storagePath(), this.hashAccount(acc.username), this.debugLog),
+            this.debugLog,
+          ),
+      ),
       this.debugLog,
     );
+    if (oauth.accountCount > 1) {
+      this.debugLog.debug('MercedesLock: %d Mercedes Me accounts configured, starting on account 1', oauth.accountCount);
+    }
     this.api2 = new MercedesApi(oauth, region, this.debugLog);
 
     this.vin = cfg.vin?.trim() || (await this.discoverVin());
@@ -211,5 +229,27 @@ export class MercedesLockPlatform implements DynamicPlatformPlugin {
 
   private hashAccount(username: string): string {
     return Buffer.from(username).toString('base64url').slice(0, 24);
+  }
+
+  /**
+   * Builds the ordered list of Mercedes Me accounts to rotate through
+   * (Mercedes allows up to 6 additional drivers per car, so this plugin
+   * can fail over to another account when one gets persistently
+   * rate-limited - see AccountRotator / MercedesWebSocket's
+   * re-login-after-429 handling). Prefers the new `accounts` array;
+   * falls back to the legacy flat `username`/`password` fields so
+   * pre-multi-account configs keep working unchanged.
+   */
+  private resolveAccounts(cfg: MercedesLockConfig): MercedesAccountConfig[] {
+    const fromArray = (cfg.accounts ?? [])
+      .filter((a) => a?.username?.trim() && a?.password)
+      .map((a) => ({ username: a.username.trim(), password: a.password }));
+    if (fromArray.length > 0) {
+      return fromArray.slice(0, 6);
+    }
+    if (cfg.username?.trim() && cfg.password) {
+      return [{ username: cfg.username.trim(), password: cfg.password }];
+    }
+    return [];
   }
 }

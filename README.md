@@ -30,12 +30,13 @@ This uses an **unofficial, reverse-engineered API** that mimics the
 Mercedes Me mobile app. It is not affiliated with or endorsed by
 Mercedes-Benz and could break or get your account flagged at any time.
 
-- **MFA must be disabled** on the account used here — the login flow
+- **MFA must be disabled** on every account used here — the login flow
   cannot answer 2FA/OTP challenges.
-- **Use a dedicated secondary Mercedes Me account**, invited as an
-  additional driver on your vehicle (Mercedes allows up to 6 per car), and
-  don't use that account simultaneously in the official app.
-- **Legal-consent / passkey-setup prompts are not handled.** If your
+- **Use one or more dedicated secondary Mercedes Me accounts**, each
+  invited as an additional driver on your vehicle (Mercedes allows up to
+  6 per car), and don't use those accounts simultaneously in the official
+  app.
+- **Legal-consent / passkey-setup prompts are not handled.** If an
   account is prompted for these on first login, log in once via the
   official Mercedes Me app with that account to clear them before using
   this plugin.
@@ -44,6 +45,35 @@ Mercedes-Benz and could break or get your account flagged at any time.
 - **China region is included for parity with `mbapi2020` but is currently
   non-functional** — Mercedes' China CIAM login presents a CAPTCHA that
   this (and the upstream) login flow cannot solve.
+
+## Multi-account failover (rate-limit workaround)
+
+Mercedes allows up to 6 accounts to be invited as additional drivers on
+the same car. Since a single account can still get rate-limited (HTTP
+429) even with conservative polling, this plugin lets you configure up to
+6 accounts and will automatically fail over between them:
+
+- The plugin always starts on the first configured account.
+- On a websocket 429, it attempts a full re-login on the **current**
+  account up to 4 times (with a growing backoff). If all 4 attempts on
+  that account are exhausted (log line: `re-login attempts exhausted
+  (4/4), not retrying login`) **and more than one account is
+  configured**, it automatically switches to the next account in the list
+  instead of giving up, and gives that account its own fresh 4-attempt
+  budget.
+- Accounts are tried in a loop: after the last configured account is
+  exhausted, the next rotation wraps back around to the first one.
+- The REST status poll and the websocket both always use whichever
+  account is currently active, so no further action is needed after a
+  switch.
+- Each account gets its own on-disk token cache, so switching back to a
+  previously-used account doesn't require a fresh login if its token is
+  still valid.
+
+If only one account is configured, behavior is unchanged from before:
+after 4 exhausted re-login attempts, the plugin logs an error and stops
+retrying login until the underlying issue (credentials, 2FA, or Mercedes
+lifting the rate limit) is resolved.
 
 ## Install
 
@@ -61,8 +91,10 @@ Configure via Homebridge UI (recommended) or `config.json`:
 {
   "platform": "MercedesLock",
   "name": "Mercedes Lock",
-  "username": "your-dedicated-account@example.com",
-  "password": "your-password",
+  "accounts": [
+    { "username": "your-dedicated-account@example.com", "password": "your-password" },
+    { "username": "your-second-account@example.com", "password": "your-second-password" }
+  ],
   "region": "North America",
   "pollIntervalSeconds": 180,
   "showLock": true,
@@ -76,7 +108,7 @@ Configure via Homebridge UI (recommended) or `config.json`:
 
 | Field | Required | Description |
 |---|---|---|
-| `username` / `password` | yes | Mercedes Me account credentials (MFA disabled) |
+| `accounts` | yes | Array of `{ username, password }` Mercedes Me accounts (MFA disabled). At least 1 is required, up to 6. The plugin logs in with the first entry and automatically fails over to the next on persistent rate limiting (see [Multi-account failover](#multi-account-failover-rate-limit-workaround) above). |
 | `region` | yes | `Europe`, `North America`, `Asia-Pacific`, or `China` |
 | `vin` | no | Set if the account has multiple vehicles; otherwise the first one is used |
 | `pollIntervalSeconds` | no | Default 180 |
@@ -87,14 +119,21 @@ Configure via Homebridge UI (recommended) or `config.json`:
 | `showEvBattery` | no | Show EV charge level (if reported by the car). Default `true` |
 | `debug` | no | Log detailed OAuth/REST/websocket diagnostics as regular (always-visible) log lines, without needing Homebridge's own debug mode enabled. Default `false` |
 
+> **Upgrading from an older config?** Pre-multi-account configs using
+> flat `username`/`password` fields still work (the plugin treats them as
+> a single-account `accounts` list), but the Homebridge UI form now
+> exposes the `accounts` array — re-save your config via the UI to
+> migrate, and add additional accounts there if you have them.
+
 The Homebridge UI groups the `show*` toggles under a "HomeKit Services"
 section in the plugin settings form. Turning a toggle off removes that
 service from the accessory (including one restored from a previous
 Homebridge run) the next time the plugin starts.
 
-The OAuth token is cached to disk under Homebridge's storage directory, so
-you won't need to re-login on every restart until the refresh token
-expires or login fails.
+The OAuth token for each account is cached to disk (one file per account)
+under Homebridge's storage directory, so you won't need to re-login on
+every restart until an account's refresh token expires or its login
+fails.
 
 ## What shows up in HomeKit
 
