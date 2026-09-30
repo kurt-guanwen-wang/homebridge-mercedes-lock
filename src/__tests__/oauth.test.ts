@@ -187,3 +187,27 @@ describe('MercedesOAuth.getAccessToken', () => {
     expect(oauth.loginCallCount).toBe(1);
   });
 });
+
+describe('MercedesOAuth.maskedUsername', () => {
+  function oauthFor(username: string): TestableOAuth {
+    return new TestableOAuth(username, 'pw', 'North America', tokenCacheStub(), noopLogger);
+  }
+
+  function tokenCacheStub(): TokenCache {
+    return { load: jest.fn().mockResolvedValue(null), save: jest.fn() } as unknown as TokenCache;
+  }
+
+  it('masks the local part of an email, keeping the domain', () => {
+    expect(oauthFor('kurt@kurtwang.net').maskedUsername).toBe('ku***@kurtwang.net');
+  });
+
+  it('masks very short local parts safely', () => {
+    expect(oauthFor('a@example.com').maskedUsername).toBe('**@example.com');
+    expect(oauthFor('ab@example.com').maskedUsername).toBe('**@example.com');
+  });
+
+  it('falls back to a generic mask for non-email usernames', () => {
+    expect(oauthFor('someusername').maskedUsername).toBe('so***');
+    expect(oauthFor('x').maskedUsername).toBe('**');
+  });
+});

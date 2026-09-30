@@ -12,10 +12,11 @@ function fakeToken(id: string): TokenInfo {
 }
 
 /** Minimal fake matching the MercedesOAuth methods AccountRotator calls. */
-function fakeAccount(id: string) {
+function fakeAccount(id: string, email = `${id}@example.com`) {
   return {
     getAccessToken: jest.fn().mockResolvedValue(`access-${id}`),
     login: jest.fn().mockResolvedValue(fakeToken(id)),
+    maskedUsername: email,
   } as unknown as MercedesOAuth;
 }
 
@@ -51,7 +52,8 @@ describe('AccountRotator', () => {
     expect(rotator.advanceAccount()).toBe(true);
     expect(rotator.currentAccountNumber).toBe(2);
     await expect(rotator.getAccessToken()).resolves.toBe('access-b');
-    expect(logger.info).toHaveBeenCalledWith(expect.stringContaining('switching'), 2, 2);
+    expect(rotator.maskedUsername).toBe('b@example.com');
+    expect(logger.info).toHaveBeenCalledWith(expect.stringContaining('switching'), 2, 2, 'b@example.com');
 
     expect(rotator.advanceAccount()).toBe(true);
     expect(rotator.currentAccountNumber).toBe(1);

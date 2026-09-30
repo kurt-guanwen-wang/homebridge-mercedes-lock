@@ -69,6 +69,9 @@ the same car. Since a single account can still get rate-limited (HTTP
 - Each account gets its own on-disk token cache, so switching back to a
   previously-used account doesn't require a fresh login if its token is
   still valid.
+- Log lines for login/token events include a masked account identifier
+  (e.g. `ku***@kurtwang.net`) so you can tell which configured account is
+  currently active without exposing the full email address in logs.
 
 If only one account is configured, behavior is unchanged from before:
 after 4 exhausted re-login attempts, the plugin logs an error and stops

@@ -43,6 +43,10 @@ export class AccountRotator implements OAuthClient {
     return this.current.login();
   }
 
+  get maskedUsername(): string {
+    return this.current.maskedUsername;
+  }
+
   get accountCount(): number {
     return this.accounts.length;
   }
@@ -62,9 +66,10 @@ export class AccountRotator implements OAuthClient {
     }
     this.index = (this.index + 1) % this.accounts.length;
     this.log.info(
-      'AccountRotator: switching to Mercedes Me account %d of %d',
+      'AccountRotator: switching to Mercedes Me account %d of %d (%s)',
       this.currentAccountNumber,
       this.accounts.length,
+      this.current.maskedUsername,
     );
     return true;
   }

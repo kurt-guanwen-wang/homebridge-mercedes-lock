@@ -22,6 +22,8 @@ interface Logger {
 export interface OAuthClient {
   getAccessToken(): Promise<string>;
   login(): Promise<TokenInfo>;
+  /** Privacy-conscious account identifier for log lines (see MercedesOAuth.maskedUsername). */
+  readonly maskedUsername: string;
   /**
    * Optional: rotates to the next configured Mercedes Me account (used
    * when the current account gets persistently rate-limited). Returns
@@ -85,6 +87,23 @@ export class MercedesOAuth {
     this.clientId = loginAppId(region);
   }
 
+  /**
+   * A privacy-conscious identifier for log lines - enough to tell two
+   * configured accounts apart (e.g. when rotating between them) without
+   * printing the full email address. E.g. "ku***@kurtwang.net". Public so
+   * AccountRotator can include it in its own rotation log line.
+   */
+  get maskedUsername(): string {
+    const at = this.username.indexOf('@');
+    if (at <= 0) {
+      return this.username.length <= 2 ? '**' : `${this.username.slice(0, 2)}***`;
+    }
+    const local = this.username.slice(0, at);
+    const domain = this.username.slice(at + 1);
+    const maskedLocal = local.length <= 2 ? '**' : `${local.slice(0, 2)}***`;
+    return `${maskedLocal}@${domain}`;
+  }
+
   /** Returns a valid access token, logging in or refreshing as needed. */
   async getAccessToken(): Promise<string> {
     if (this.inFlightToken) {
@@ -115,7 +134,11 @@ export class MercedesOAuth {
         await this.loginWithBackoff();
       }
     } else {
-      this.log.debug('OAuth: using cached access token (valid until %s)', new Date(this.token!.expires_at * 1000).toISOString());
+      this.log.debug(
+        'OAuth: using cached access token (account=%s, valid until %s)',
+        this.maskedUsername,
+        new Date(this.token!.expires_at * 1000).toISOString(),
+      );
     }
 
     return this.token!.access_token;
@@ -144,7 +167,8 @@ export class MercedesOAuth {
     } catch (err) {
       this.loginBlockedUntil = Date.now() + this.loginBackoffMs;
       this.log.warn(
-        'Login failed, will not retry for %ds: %s',
+        'Login failed (account=%s), will not retry for %ds: %s',
+        this.maskedUsername,
         Math.ceil(this.loginBackoffMs / 1000),
         (err as Error).message,
       );
@@ -188,7 +212,7 @@ export class MercedesOAuth {
   }
 
   private async loginInternal(): Promise<TokenInfo> {
-    this.log.info('Starting Mercedes Me OAuth2 login (region=%s)', this.region);
+    this.log.info('Starting Mercedes Me OAuth2 login (account=%s, region=%s)', this.maskedUsername, this.region);
     this.generatePkce();
     this.jar.set('CIAM.DEVICE', randomBytes(16).toString('hex'));
 
@@ -225,7 +249,11 @@ export class MercedesOAuth {
     await this.tokenCache.save(token);
     this.codeVerifier = '';
     this.codeChallenge = '';
-    this.log.info('Mercedes Me OAuth2 login successful (token valid until %s)', new Date(token.expires_at * 1000).toISOString());
+    this.log.info(
+      'Mercedes Me OAuth2 login successful (account=%s, token valid until %s)',
+      this.maskedUsername,
+      new Date(token.expires_at * 1000).toISOString(),
+    );
     return token;
   }
 
@@ -378,7 +406,11 @@ export class MercedesOAuth {
     const token = this.finalizeToken(body);
     this.token = token;
     await this.tokenCache.save(token);
-    this.log.debug('OAuth: token refresh succeeded (valid until %s)', new Date(token.expires_at * 1000).toISOString());
+    this.log.debug(
+      'OAuth: token refresh succeeded (account=%s, valid until %s)',
+      this.maskedUsername,
+      new Date(token.expires_at * 1000).toISOString(),
+    );
     return token;
   }
 

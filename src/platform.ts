@@ -124,7 +124,11 @@ export class MercedesLockPlatform implements DynamicPlatformPlugin {
       this.debugLog,
     );
     if (oauth.accountCount > 1) {
-      this.debugLog.debug('MercedesLock: %d Mercedes Me accounts configured, starting on account 1', oauth.accountCount);
+      this.debugLog.debug(
+        'MercedesLock: %d Mercedes Me accounts configured, starting on account 1 (%s)',
+        oauth.accountCount,
+        oauth.maskedUsername,
+      );
     }
     this.api2 = new MercedesApi(oauth, region, this.debugLog);
 
