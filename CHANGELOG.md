@@ -1,3 +1,10 @@
+## [1.2.1](https://github.com/kurt-guanwen-wang/homebridge-mercedes-lock/compare/v1.2.0...v1.2.1) (2026-09-30)
+
+
+### Bug Fixes
+
+* log which user been used to login ([0377973](https://github.com/kurt-guanwen-wang/homebridge-mercedes-lock/commit/0377973f2db2352033bfc0cf0d0e5ae100af5a36))
+
 # [1.2.0](https://github.com/kurt-guanwen-wang/homebridge-mercedes-lock/compare/v1.1.1...v1.2.0) (2026-09-30)
 
 
