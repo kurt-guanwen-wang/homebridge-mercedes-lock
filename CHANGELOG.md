@@ -1,3 +1,10 @@
+# [1.2.0](https://github.com/kurt-guanwen-wang/homebridge-mercedes-lock/compare/v1.1.1...v1.2.0) (2026-09-30)
+
+
+### Features
+
+* support multipe account rotation as workaround for rate limit ([cbbaf6b](https://github.com/kurt-guanwen-wang/homebridge-mercedes-lock/commit/cbbaf6bbebbc528d97c034b342a48562a2eb5f29))
+
 ## [1.1.1](https://github.com/kurt-guanwen-wang/homebridge-mercedes-lock/compare/v1.1.0...v1.1.1) (2026-09-23)
 
 
