@@ -1,3 +1,10 @@
+# [1.3.0](https://github.com/kurt-guanwen-wang/homebridge-mercedes-lock/compare/v1.2.1...v1.3.0) (2026-10-15)
+
+
+### Features
+
+* report accessory manufacturer, model, serial number and firmware to HomeKit ([a8e65df](https://github.com/kurt-guanwen-wang/homebridge-mercedes-lock/commit/a8e65df9c9b5269dd0956c7fa6ac25da7ae7b042))
+
 ## [1.2.1](https://github.com/kurt-guanwen-wang/homebridge-mercedes-lock/compare/v1.2.0...v1.2.1) (2026-09-30)
 
 
