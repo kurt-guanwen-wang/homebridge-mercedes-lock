@@ -1,19 +1,18 @@
-import type { API } from 'homebridge';
-import * as hap from 'hap-nodejs';
-// eslint-disable-next-line @typescript-eslint/no-var-requires
-const { PlatformAccessory } = require('homebridge/lib/platformAccessory');
+import type { API, PlatformAccessory } from 'homebridge';
+import * as hap from '@homebridge/hap-nodejs';
 import { CarAccessory, CarAccessoryOptions } from '../carAccessory';
 import { DoorLockStatusVehicle } from '../constants';
 import { CarStatus } from '../vehicleStatus';
 
 /** Minimal fake of the Homebridge `API` object: only `hap.Service`/`hap.Characteristic`
  * are used by CarAccessory, so we wire those to the real hap-nodejs implementations
- * (available as a transitive dependency of `homebridge`) for realistic behavior. */
+ * for realistic behavior. Homebridge 2 is ESM-only and doesn't expose PlatformAccessory,
+ * so tests use hap's Accessory, which provides the service methods CarAccessory needs. */
 const fakeApi = { hap: { Service: hap.Service, Characteristic: hap.Characteristic } } as unknown as API;
 
-function newAccessory(): InstanceType<typeof PlatformAccessory> {
+function newAccessory(): PlatformAccessory {
   const uuid = hap.uuid.generate(`test-${Math.random()}`);
-  return new PlatformAccessory('Test Car', uuid);
+  return new hap.Accessory('Test Car', uuid) as unknown as PlatformAccessory;
 }
 
 const ALL_ENABLED: CarAccessoryOptions = {

@@ -286,7 +286,6 @@ export class MercedesOAuth {
       const res = await request(current, {
         method: 'GET',
         headers: { ...headers, cookie: this.jar.header() },
-        maxRedirections: 0,
       });
       this.jar.absorb(res.headers['set-cookie'] as string | string[] | undefined);
 
@@ -348,7 +347,6 @@ export class MercedesOAuth {
         accept: 'text/html,application/xhtml+xml',
       },
       body: new URLSearchParams({ token }).toString(),
-      maxRedirections: 0,
     });
 
     const location = res.headers.location as string | undefined;
