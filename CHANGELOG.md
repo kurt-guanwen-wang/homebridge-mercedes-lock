@@ -1,3 +1,10 @@
+## [1.3.1](https://github.com/kurt-guanwen-wang/homebridge-mercedes-lock/compare/v1.3.0...v1.3.1) (2026-10-15)
+
+
+### Bug Fixes
+
+* **deps:** upgrade dependencies ([08b65c5](https://github.com/kurt-guanwen-wang/homebridge-mercedes-lock/commit/08b65c5673e2b3b8f1b8481ec467717a252763f2))
+
 # [1.3.0](https://github.com/kurt-guanwen-wang/homebridge-mercedes-lock/compare/v1.2.1...v1.3.0) (2026-10-15)
 
 
