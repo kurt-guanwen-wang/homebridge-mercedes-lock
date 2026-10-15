@@ -1,3 +1,4 @@
+import pkg from '../package.json';
 import type { API, DynamicPlatformPlugin, Logging, PlatformAccessory, PlatformConfig } from 'homebridge';
 import { PLATFORM_NAME, PLUGIN_NAME } from './settings';
 import { MercedesOAuth } from './oauth';
@@ -191,6 +192,14 @@ export class MercedesLockPlatform implements DynamicPlatformPlugin {
       const infoService = accessory.getService(this.api.hap.Service.AccessoryInformation);
       infoService?.updateCharacteristic(this.api.hap.Characteristic.Name, name);
     }
+
+    const { Service, Characteristic } = this.api.hap;
+    const info = accessory.getService(Service.AccessoryInformation) ?? accessory.addService(Service.AccessoryInformation);
+    info
+      .setCharacteristic(Characteristic.Manufacturer, 'homebridge-mercedes-lock')
+      .setCharacteristic(Characteristic.Model, 'homebridge-mercedes-lock')
+      .setCharacteristic(Characteristic.SerialNumber, vin)
+      .setCharacteristic(Characteristic.FirmwareRevision, pkg.version);
 
     const options: CarAccessoryOptions = {
       showLock: cfg.showLock ?? true,
